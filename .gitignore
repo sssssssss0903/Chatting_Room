@@ -1,0 +1,23 @@
+# 忽略 VS 本地设置
+.vs/
+*.user
+*.suo
+
+# 忽略构建输出
+bin/
+obj/
+*.exe
+*.dll
+*.pdb
+*.cache
+*.log
+
+# 忽略包和临时文件
+packages/
+*.nupkg
+*.tmp
+*.db
+
+# 忽略 Mac 和 Windows 系统文件
+.DS_Store
+Thumbs.db
