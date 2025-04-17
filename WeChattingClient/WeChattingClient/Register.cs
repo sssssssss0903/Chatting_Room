@@ -15,7 +15,7 @@ namespace WeChattingClient
     {
         private string account;
         private static string connectstring = "data source=localhost;database=wechatting;" +
-"user id=root;password=123456;pooling=true;charset=utf8;";
+"user id=root;password=admin;pooling=true;charset=utf8;";
         MySqlConnection msc;
         MySqlCommand cmd;
         MySqlDataReader reader;
