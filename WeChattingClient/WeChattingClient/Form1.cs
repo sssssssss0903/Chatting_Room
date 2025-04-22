@@ -34,7 +34,7 @@ namespace WeChattingClient
         private System.Windows.Forms.Timer timer;
         //请求连接数据库
         private static string connectstring = "data source=localhost;database=wechatting;" +
-     "user id=root;password=123456;pooling=true;charset=utf8;";
+     "user id=root;password=admin;pooling=true;charset=utf8;";
         //好友列表UID+姓名
         Dictionary<string, string> friend = new Dictionary<string, string>();
         Dictionary<string, string> friendChatInfo = new Dictionary<string, string>();
