@@ -20,7 +20,7 @@ namespace WeChattingClient
         //当前账号  密码 姓名
         private string Myaccount;
         private string MyPassword;
-        private static string name;
+        private static string MyName;
 
         private static UdpClient client;
         private  int port;
@@ -28,13 +28,13 @@ namespace WeChattingClient
         private bool isRunning;
         //是否收到新消息
         bool receiveNews=false;
-        //收到消息的人的姓名和消息！！！不一定是当前正在聊天的对象
+        //收到消息的人的姓名和消息
         string friendName;
         string chatInfo;
         private System.Windows.Forms.Timer timer;
         //请求连接数据库
         private static string connectstring = "data source=localhost;database=wechatting;" +
-     "user id=root;password=admin;pooling=true;charset=utf8;";
+     "user id=root;password=123456;pooling=true;charset=utf8;";
         //好友列表UID+姓名
         Dictionary<string, string> friend = new Dictionary<string, string>();
         Dictionary<string, string> friendChatInfo = new Dictionary<string, string>();
@@ -49,91 +49,213 @@ namespace WeChattingClient
             InitializeComponent();
         }
         #region 带参构造函数
-        public Form1(string myaccount,string mypassword ,string myname)
+        public Form1(string myaccount, string mypassword, string myname)
         {
-
             InitializeComponent();
             this.FormClosing += Form1_FormClosing;
+
             Myaccount = myaccount;
             MyPassword = mypassword;
             isRunning = true;
             timer = new System.Windows.Forms.Timer();
             timer.Interval = 1000; // 1秒检查一次是否有新消息
-            timer.Tick += ShowDia; // 设置定时器的事件处理程序
-
-            // 启动定时器
+            timer.Tick += ShowDia;
             timer.Start();
-            //获取好友列表
+
+            // 获取好友列表
             try
             {
-                string sqlFriend = "select Friend,Name from friend where UID=" + Myaccount;
-                MySqlConnection mscFriend = new MySqlConnection(connectstring);
-                MySqlCommand cmdFriend = new MySqlCommand(sqlFriend, mscFriend);
-                //开启读数据库
-                mscFriend.Open();
-                MySqlDataReader readerFriend = cmdFriend.ExecuteReader();
-                while (readerFriend.Read())
+                string sqlFriend = "SELECT FriendUID, UIDName FROM friend WHERE Myaccount = @uid";
+                using (MySqlConnection mscFriend = new MySqlConnection(connectstring))
                 {
-                    string friendUID = readerFriend.GetString(0);
-
-                    string friendName = readerFriend.GetString(1);
-                    friend.Add(friendUID, friendName);
+                    MySqlCommand cmdFriend = new MySqlCommand(sqlFriend, mscFriend);
+                    cmdFriend.Parameters.AddWithValue("@uid", Myaccount);
+                    mscFriend.Open();
+                    using (MySqlDataReader readerFriend = cmdFriend.ExecuteReader())
+                    {
+                        while (readerFriend.Read())
+                        {
+                            string friendUID = readerFriend.GetString(0);
+                            string friendName = readerFriend.GetString(1);
+                            friend.Add(friendUID, friendName);
+                        }
+                    }
                 }
-                readerFriend.Close();
-                mscFriend.Close();
             }
-            catch
+            catch (Exception ex)
             {
-                MessageBox.Show("数据库操作失败");
+                MessageBox.Show("数据库操作失败：" + ex.Message);
             }
-            name = myname;
-         
-            //显示好友列表
-            foreach( string fname in friend.Values)
+
+            MyName = myname;
+
+            // 显示好友列表
+            foreach (string fname in friend.Values)
             {
-                // 创建一个 ListViewItem 对象
-                ListViewItem item = new ListViewItem(fname); // 在第一列添加数据
-                // 将 ListViewItem 添加到 ListView 的 Items 集合中
+                ListViewItem item = new ListViewItem(fname);
                 this.listFriend.Items.Add(item);
             }
 
-            //群聊
-
+            // 群聊
             ListViewItem itemGroup = new ListViewItem("群聊");
             listFriend.Items.Add(itemGroup);
-            //默认先显示第一个好友的聊天内容
-            string kvpSearch= listFriend.Items[0].Text;
-            chatFriend = kvpSearch;
-            foreach (KeyValuePair<string,string> kvp in friend)
+
+            // 默认先显示第一个聊天对象
+            string kvpSearch = listFriend.Items[0].Text;
+
+            if (kvpSearch == "群聊")
             {
-                if (kvp.Value.Equals(kvpSearch))
+                chatFriend = "000000"; // 群聊特殊UID
+            }
+            else
+            {
+                foreach (KeyValuePair<string, string> kvp in friend)
                 {
-                    //获取当前聊天对象UID
-                    chatFriend = kvp.Key;
+                    if (kvp.Value.Equals(kvpSearch))
+                    {
+                        chatFriend = kvp.Key;
+                        break;
+                    }
                 }
             }
-            //初始化聊天框
+
+            // 初始化聊天框
             Panel chatBox = new Panel();
             chatBox.AutoScroll = true;
             chatBox.Name = kvpSearch;
             chatBox.BackColor = Color.White;
             chatBox.Dock = DockStyle.Fill;
+
             string imagePath = @"..\Resources\bkgend.png";
             string directoryPath = Path.GetDirectoryName(Application.StartupPath);
             string fullPath = Path.Combine(directoryPath, imagePath);
-            chatBox.BackgroundImage = Image.FromFile(fullPath);
-            chatBox.BackgroundImageLayout = ImageLayout.Stretch;
+            if (File.Exists(fullPath))
+            {
+                chatBox.BackgroundImage = Image.FromFile(fullPath);
+                chatBox.BackgroundImageLayout = ImageLayout.Stretch;
+            }
+
             curPanel = chatBox;
-            // 将聊天框添加到容器中
             panelChat.Controls.Add(chatBox);
-           
-           
+
+            //  加载历史聊天记录
+            LoadHistoryMessages(kvpSearch);
         }
+
+
 
         private void Form1_FormClosed(object sender, FormClosedEventArgs e)
         {
             throw new NotImplementedException();
         }
+        private void LoadHistoryMessages(string friendName)
+        {
+            string sql = "";
+            string friendUID = "";
+
+            try
+            {
+                using (MySqlConnection conn = new MySqlConnection(connectstring))
+                {
+                    conn.Open();
+
+                    if (friendName == "群聊")
+                    {
+                        friendUID = "000000";
+                        sql = $"SELECT sender, receiver, message, send_time FROM chatinfo WHERE receiver = '000000' ORDER BY send_time ASC";
+                    }
+                    else
+                    {
+                        // 从 friend 字典中找到对应UID
+                        if (!friend.TryGetValue(friendName, out friendUID))
+                        {
+                            friendUID = friend.FirstOrDefault(x => x.Value == friendName).Key;
+                        }
+                        sql = $"SELECT sender, receiver, message, send_time FROM chatinfo WHERE (sender=@me AND receiver=@friend) OR (sender=@friend AND receiver=@me) ORDER BY send_time ASC";
+                    }
+
+                    using (MySqlCommand cmd = new MySqlCommand(sql, conn))
+                    {
+                        if (friendName != "群聊")
+                        {
+                            cmd.Parameters.AddWithValue("@me", Myaccount);
+                            cmd.Parameters.AddWithValue("@friend", friendUID);
+                        }
+
+                        using (MySqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            Panel panelReceive = panelChat.Controls.Find(friendName, false).FirstOrDefault() as Panel;
+                            if (panelReceive == null) return;
+
+                            int index = 0;
+                            while (reader.Read())
+                            {
+                                string sender = reader.GetString("sender");
+                                string receiver = reader.GetString("receiver");
+                                string message = reader.GetString("message");
+                                DateTime sendTime = reader.GetDateTime("send_time");
+
+                                TextBox textBox = new TextBox();
+                                textBox.Multiline = true;
+                                textBox.ReadOnly = true;
+                                textBox.BorderStyle = BorderStyle.None;
+                                textBox.Font = new Font("Arial", 12, FontStyle.Bold);
+                                textBox.Width = panelReceive.Width / 3;
+
+                                // 文本内容：时间换行+内容
+                                string showText;
+                                if (friendName == "群聊" && sender != Myaccount)
+                                {
+                                    showText = $"[{sendTime:yyyy-MM-dd HH:mm:ss}]\r\n{sender}: {message}";
+                                }
+                                else
+                                {
+                                    showText = $"[{sendTime:yyyy-MM-dd HH:mm:ss}]\r\n{message}";
+                                }
+                                textBox.Text = showText;
+
+                                // 动态计算高度（更自然换行）
+                                int baseHeight = textBox.Font.Height;
+                                int lineCount = showText.Split('\n').Length;
+                                lineCount += showText.Length / (textBox.Width / 10); // 简单估算太长一行也换行
+                                textBox.Height = Math.Max(baseHeight * lineCount + 10, 50);
+
+                                // 设置 Top
+                                int controlCount = panelReceive.Controls.OfType<TextBox>().Count();
+                                int yOffset = 10;
+                                textBox.Top = controlCount * (textBox.Height + yOffset);
+
+                                // 设置颜色和左右位置
+                                if (sender == Myaccount)
+                                {
+                                    textBox.BackColor = Color.LightBlue;
+                                    textBox.TextAlign = HorizontalAlignment.Left;
+                                    textBox.Left = panelReceive.Width - textBox.Width - 5;
+                                    textBox.ForeColor = Color.LightCoral;
+                                }
+                                else
+                                {
+                                    textBox.BackColor = Color.LightGreen;
+                                    textBox.TextAlign = HorizontalAlignment.Left;
+                                    textBox.Left = 5;
+                                    textBox.ForeColor = Color.Black;
+                                }
+
+                                panelReceive.Controls.Add(textBox);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("加载历史聊天记录失败：" + ex.Message);
+            }
+        }
+
+
+
+
         #endregion
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
@@ -146,41 +268,73 @@ namespace WeChattingClient
 
         private void buttonSend_Click(object sender, EventArgs e)
         {
-            //发送信息时，要附带对方和自己的身份识别信息；
-            string sendMessage = chatFriend+"$"+textSend.Text+"$"+Myaccount;
+            if (string.IsNullOrWhiteSpace(textSend.Text))
+                return; // 防止发送空消息
+
+            // 发送信息，格式: 目标UID$text内容$自己UID
+            string sendMessage = chatFriend + "$" + textSend.Text + "$" + Myaccount;
             byte[] sendBytes = Encoding.UTF8.GetBytes(sendMessage);
-            client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("10.133.201.218"), 8888));
-            string sqlAddFriendMessage = "insert into " + Myaccount + "chatinfo values(@value1,@value2,@value3)";
-            MySqlConnection mscaddFriendMessage = new MySqlConnection(connectstring);
-            mscaddFriendMessage.Open();
-           MySqlCommand cmdAddFriendMessage = new MySqlCommand(sqlAddFriendMessage, mscaddFriendMessage);
-            cmdAddFriendMessage.Parameters.AddWithValue("@value1", Myaccount);
-            cmdAddFriendMessage.Parameters.AddWithValue("@value2", chatFriend);
-            cmdAddFriendMessage.Parameters.AddWithValue("@value3", textSend.Text);
-            cmdAddFriendMessage.ExecuteNonQuery();
-            cmdAddFriendMessage.Dispose();
-            mscaddFriendMessage.Close();
-            //显示自己信息
+
+            client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("10.138.179.108"), 8888));
+
+            // 写入统一的 chatinfo 表，带发送时间
+            try
+            {
+                using (MySqlConnection conn = new MySqlConnection(connectstring))
+                {
+                    conn.Open();
+                    string sqlInsert = "INSERT INTO chatinfo (sender, receiver, message, send_time) VALUES (@sender, @receiver, @message, @send_time)";
+                    using (MySqlCommand cmd = new MySqlCommand(sqlInsert, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@sender", Myaccount);    // 自己是发送者
+                        cmd.Parameters.AddWithValue("@receiver", chatFriend); // 接收者可以是好友UID或者"000000"群聊
+                        cmd.Parameters.AddWithValue("@message", textSend.Text);
+                        cmd.Parameters.AddWithValue("@send_time", DateTime.Now); // 当前时间
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("发送消息失败：" + ex.Message);
+            }
+
+            // 显示自己发送的消息
             TextBox textBox = new TextBox();
-            textBox.Top = curPanel.Controls.OfType<TextBox>().Count() * 40;
-            textBox.Text = textSend.Text;
             textBox.Multiline = true;
             textBox.ReadOnly = true;
             textBox.BorderStyle = BorderStyle.None;
+            textBox.Font = new Font("Arial", 12, FontStyle.Bold);
+            textBox.Width = curPanel.Width / 3;
             textBox.BackColor = Color.LightBlue;
             textBox.TextAlign = HorizontalAlignment.Left;
-            textBox.Font = new Font("Arial", 12, FontStyle.Bold);
             textBox.ForeColor = Color.LightCoral;
+            textBox.Left = curPanel.Width - textBox.Width - 5;
 
-            // 设置 textBox 的大小和位置
-            textBox.Width = curPanel.Width/3; // 根据实际需求设置宽度
-            textBox.Left= curPanel.Width-5-textBox.Width; // 根据实际需求设置左侧边距
-            // 添加到聊天面板
+            // 文本内容：时间 + 换行 + 内容
+            string showText = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}]\r\n{textSend.Text}";
+            textBox.Text = showText;
+
+            // 计算高度（动态）
+            int baseHeight = textBox.Font.Height;
+            int lineCount = showText.Split('\n').Length;
+            lineCount += showText.Length / (textBox.Width / 10); // 字符太多也需要换行
+            textBox.Height = Math.Max(baseHeight * lineCount + 10, 50);
+
+            // 位置调整
+            int controlCount = curPanel.Controls.OfType<TextBox>().Count();
+            int yOffset = 10;
+            textBox.Top = controlCount * (textBox.Height + yOffset);
+
             curPanel.Controls.Add(textBox);
+
             textSend.Text = "";
 
+
         }
+
         #endregion
+
         #region 初次请求连接
         //连接
         //点击登录时调用
@@ -191,10 +345,17 @@ namespace WeChattingClient
             //本地地址
             client = new UdpClient(new IPEndPoint(IPAddress.Any, port));
             //发送加入请求  表明身份
-            byte[] sendBytes = Encoding.UTF8.GetBytes($"######"+"$"+"{name}】请求加入聊天室"+"$"+Myaccount);
-            //找到主机并请求加入聊天
-            client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("10.133.201.218"), 8888));
-            listMessage.Items.Add("成功加入聊天");
+            byte[] sendBytes = Encoding.UTF8.GetBytes($"######${MyName}】请求加入聊天室${Myaccount}");
+
+            try
+            {
+                client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("10.138.179.108"), 8888));
+                listMessage.Items.Add("成功加入聊天");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("发送加入请求失败：" + ex.Message);
+            }
             //开始接收
             await Task.Run(() => ReceiveMessages());
 
@@ -206,19 +367,21 @@ namespace WeChattingClient
         {
             if (listFriend.SelectedItems.Count > 0)
             {
-                //先关闭当前已经打开的聊天框
+                // 先关闭当前打开的聊天框
                 foreach (Panel p in panelChat.Controls)
                 {
                     if (p.Visible == true)
                         p.Visible = false;
                 }
-                //获取点击的好友姓名
+
+                // 获取点击的好友名字
                 ListViewItem selectFriend = listFriend.SelectedItems[0];
                 string friendName = selectFriend.Text;
-                //更改目前正在聊天的好友UID
+
+                // 根据名字修改chatFriend
                 if (friendName.Equals("群聊"))
                 {
-                    chatFriend = "000000";//如果是群聊，则UID为000000
+                    chatFriend = "000000"; // 群聊UID固定
                 }
                 else
                 {
@@ -228,78 +391,114 @@ namespace WeChattingClient
                             chatFriend = kvp.Key;
                     }
                 }
+
+                // 切换聊天框
                 ShowChatBox(friendName);
             }
         }
+
         #endregion
         #region 切换对话框，在每次切换聊天好友时调用
         //显示与好友的对话框
         public void ShowChatBox(string friendName)
         {
             Control[] existingChatBoxes = panelChat.Controls.Find(friendName, false);
-            if(existingChatBoxes.Length>0)//已经存在此好友的聊天框控件
+
+            if (existingChatBoxes.Length > 0) // 已存在聊天框
             {
-                existingChatBoxes[0].Visible = true; // 显示已存在的聊天框
+                existingChatBoxes[0].Visible = true;
                 curPanel = (Panel)existingChatBoxes[0];
             }
             else
             {
-
-                // 创建新的聊天
-                Panel chatBox = new Panel();              
+                // 创建新的聊天框
+                Panel chatBox = new Panel();
                 chatBox.AutoScroll = true;
                 chatBox.Name = friendName;
                 chatBox.BackColor = Color.White;
                 chatBox.Dock = DockStyle.Fill;
+
                 string imagePath = @"..\Resources\bkgend.png";
                 string directoryPath = Path.GetDirectoryName(Application.StartupPath);
                 string fullPath = Path.Combine(directoryPath, imagePath);
-                chatBox.BackgroundImage = Image.FromFile(fullPath);
-                chatBox.BackgroundImageLayout = ImageLayout.Stretch;
+
+                if (File.Exists(fullPath))
+                {
+                    chatBox.BackgroundImage = Image.FromFile(fullPath);
+                    chatBox.BackgroundImageLayout = ImageLayout.Stretch;
+                }
+
                 curPanel = chatBox;
-
-                // 将聊天框添加到容器中
                 panelChat.Controls.Add(chatBox);
-            }
 
+                //  新建完后，加载聊天历史
+                LoadHistoryMessages(friendName);
+            }
         }
+
         #endregion
         #region 接收信息线程
         private void ReceiveMessages()
         {
             while (isRunning)
             {
-                IPEndPoint serverEP = new IPEndPoint(IPAddress.Any, 0);
-                //阻塞
-                byte[] receiveBytes = client.Receive(ref serverEP);
-                Console.WriteLine("收到消息");
-                string receiveMessage = Encoding.UTF8.GetString(receiveBytes);
-                if (receiveMessage.Length > 0)
+                try
                 {
-                    //聊天内容
-                    int lastIndex = receiveMessage.LastIndexOf("$");
+                    IPEndPoint serverEP = new IPEndPoint(IPAddress.Any, 0);
+                    byte[] receiveBytes = client.Receive(ref serverEP);
 
-                    chatInfo = receiveMessage.Substring(0,lastIndex);
-                    //朋友身份信息
-                    string friendInfo = receiveMessage.Substring(lastIndex +1 );
-                    string sqlAddFriendMessage = "insert into " + Myaccount + "chatinfo values(@value1,@value2,@value3)";
-                    MySqlConnection mscaddFriendMessage = new MySqlConnection(connectstring);
-                    mscaddFriendMessage.Open();
-                    MySqlCommand cmdAddFriendMessage = new MySqlCommand(sqlAddFriendMessage, mscaddFriendMessage);
-                    cmdAddFriendMessage.Parameters.AddWithValue("@value1",friendInfo);
-                    cmdAddFriendMessage.Parameters.AddWithValue("@value2", Myaccount);
-                    cmdAddFriendMessage.Parameters.AddWithValue("@value3", chatInfo);
-                    cmdAddFriendMessage.ExecuteNonQuery();
-                    cmdAddFriendMessage.Dispose();
-                    mscaddFriendMessage.Close();
-                    //根据发送来的消息选择添加到哪个聊天框
-                    //1.根据UID-》Name-》Panel
-                    friend.TryGetValue(friendInfo, out friendName);
-                   
-                    receiveNews = true;
+                    if (receiveBytes != null && receiveBytes.Length > 0)
+                    {
+                        Console.WriteLine("收到消息");
+
+                        string receiveMessage = Encoding.UTF8.GetString(receiveBytes);
+
+                        // 拆分聊天内容和发送者身份
+                        int lastIndex = receiveMessage.LastIndexOf("$");
+                        if (lastIndex == -1) continue; // 格式错误，跳过
+
+                        chatInfo = receiveMessage.Substring(0, lastIndex);
+                        string friendInfo = receiveMessage.Substring(lastIndex + 1);
+
+                        // 保存到统一chatinfo表
+                        using (MySqlConnection conn = new MySqlConnection(connectstring))
+                        {
+                            conn.Open();
+                            string sql = "INSERT INTO chatinfo (sender, receiver, message, send_time) VALUES (@sender, @receiver, @message, @send_time)";
+                            using (MySqlCommand cmd = new MySqlCommand(sql, conn))
+                            {
+                                cmd.Parameters.AddWithValue("@sender", friendInfo);
+                                cmd.Parameters.AddWithValue("@receiver", Myaccount);
+                                cmd.Parameters.AddWithValue("@message", chatInfo);
+                                cmd.Parameters.AddWithValue("@send_time", DateTime.Now); // 当前时间
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+
+                        // 更新聊天面板
+                        if (!friend.TryGetValue(friendInfo, out friendName))
+                        {
+                            if (friendInfo == "000000")
+                                friendName = "群聊";
+                            else
+                                friendName = friendInfo; // 临时好友（直接UID）
+                        }
+
+                        receiveNews = true;
+                    }
+                }
+                catch (SocketException ex)
+                {
+                    Console.WriteLine("ReceiveMessages Socket异常（正常关闭）：" + ex.Message);
+                    break; // 退出线程
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("ReceiveMessages 其他异常：" + ex.Message);
                 }
             }
         }
+
         #endregion
         #region 显示新信息，由时钟事件触发
         public void ShowDia(object sender, EventArgs e)
@@ -307,33 +506,82 @@ namespace WeChattingClient
             if (receiveNews)
             {
                 Control[] existingChatBoxes = panelChat.Controls.Find(friendName, false);
-                //listMessage.Items.Add(receiveMessage);
+
                 if (existingChatBoxes.Length > 0)
                 {
                     Panel panelReceive = (Panel)existingChatBoxes[0];
-                    TextBox textBox = new TextBox();
 
-                    textBox.Text = chatInfo;
-                    textBox.Multiline = true;
-                    textBox.ReadOnly = true;
-                    textBox.BorderStyle = BorderStyle.None;
-                    textBox.BackColor = Color.LightBlue;
-                    textBox.TextAlign = HorizontalAlignment.Left;
-                    textBox.Font = new Font("Arial", 12, FontStyle.Bold);
-                    textBox.ForeColor = Color.LightCoral;
-                    textBox.Top = curPanel.Controls.OfType<TextBox>().Count() * 40;
-                    // 设置 textBox 的大小和位置
-                    textBox.Width = panelReceive.Width/3; // 根据实际需求设置宽度
-                    textBox.Left = 5; // 根据实际需求设置左侧边距
+                    try
+                    {
+                        using (MySqlConnection conn = new MySqlConnection(connectstring))
+                        {
+                            conn.Open();
 
-                    // 添加到聊天面板
-                    panelReceive.Controls.Add(textBox);
+                            // 从 chatinfo 里查询最近一条消息（发送人是 friendName，对象是自己）
+                            string sql = "SELECT message, send_time FROM chatinfo WHERE sender = @sender AND receiver = @receiver ORDER BY send_time DESC LIMIT 1";
+                            using (MySqlCommand cmd = new MySqlCommand(sql, conn))
+                            {
+                                if (friendName == "群聊")
+                                {
+                                    cmd.Parameters.AddWithValue("@sender", "000000"); // 群聊发送者
+                                    cmd.Parameters.AddWithValue("@receiver", Myaccount);
+                                }
+                                else
+                                {
+                                    cmd.Parameters.AddWithValue("@sender", friend.FirstOrDefault(x => x.Value == friendName).Key);
+                                    cmd.Parameters.AddWithValue("@receiver", Myaccount);
+                                }
 
+                                using (MySqlDataReader reader = cmd.ExecuteReader())
+                                {
+                                    if (reader.Read())
+                                    {
+                                        string message = reader.GetString("message");
+                                        DateTime sendTime = reader.GetDateTime("send_time");
 
-                    receiveNews = false;//等待新消息来
+                                        // 先添加时间标签
+                                        Label timeLabel = new Label();
+                                        timeLabel.Text = sendTime.ToString("yyyy-MM-dd HH:mm:ss");
+                                        timeLabel.AutoSize = true;
+                                        timeLabel.Font = new Font("Arial", 9, FontStyle.Italic);
+                                        timeLabel.ForeColor = Color.Gray;
+                                        timeLabel.Top = panelReceive.Controls.OfType<Control>().Count() * 50;
+                                        timeLabel.Left = panelReceive.Width / 2 - 50; // 居中大概的位置
+                                        panelReceive.Controls.Add(timeLabel);
+
+                                        // 再添加消息框
+                                        TextBox textBox = new TextBox();
+                                        textBox.Text = message;
+                                        textBox.Multiline = true;
+                                        textBox.ReadOnly = true;
+                                        textBox.BorderStyle = BorderStyle.None;
+                                        textBox.BackColor = Color.LightGreen; // 接收到的消息绿色区分
+                                        textBox.TextAlign = HorizontalAlignment.Left;
+                                        textBox.Font = new Font("Arial", 12, FontStyle.Regular);
+                                        textBox.ForeColor = Color.Black;
+                                        textBox.Padding = new Padding(5);
+
+                                        textBox.Width = panelReceive.Width / 3;
+                                        textBox.Top = timeLabel.Top + 20; // 比时间往下挪一点
+                                        textBox.Left = 5;
+
+                                        panelReceive.Controls.Add(textBox);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("显示新消息失败：" + ex.Message);
+                    }
+
+                    receiveNews = false;
                 }
             }
         }
+
+
         #endregion
 
         private void buttonAdd_Click(object sender, EventArgs e)
@@ -360,71 +608,145 @@ namespace WeChattingClient
 
         private void buttonSureAdd_Click(object sender, EventArgs e)
         {
-            bool isSearched = false;
-            string searchUID = this.textAdd.Text;
-            string sqlUID = "select UID,UserName from userinfo where UID=" + searchUID;
-            MySqlConnection mscUID = new MySqlConnection(connectstring);
-            MySqlCommand cmdUID = new MySqlCommand(sqlUID, mscUID);
-            mscUID.Open();
-            MySqlDataReader readerUID = cmdUID.ExecuteReader();
-            while(readerUID.Read())
+            string searchUID = this.textAdd.Text.Trim();
+
+            if (string.IsNullOrEmpty(searchUID))
             {
-                string UID = readerUID.GetString(0);
-                if(searchUID.Equals(UID))
+                MessageBox.Show("请输入要搜索的UID");
+                return;
+            }
+
+            this.listAdd.Items.Clear(); // 清空之前的搜索结果
+
+            string sqlUID = "SELECT UID, UserName FROM userinfo WHERE UID = @uid";
+
+            using (MySqlConnection mscUID = new MySqlConnection(connectstring))
+            {
+                MySqlCommand cmdUID = new MySqlCommand(sqlUID, mscUID);
+                cmdUID.Parameters.AddWithValue("@uid", searchUID);
+                mscUID.Open();
+                using (MySqlDataReader readerUID = cmdUID.ExecuteReader())
                 {
-                    string name = readerUID.GetString(1);
-                    this.listAdd.Items.Add(name);
-                    haveSearched = true;
-                    isSearched = true;
+                    if (readerUID.Read())
+                    {
+                        string name = readerUID.GetString(1);
+                        this.listAdd.Items.Add(name);
+                    }
+                    else
+                    {
+                        this.listAdd.Items.Add("不存在此人");
+                    }
                 }
             }
-            if(!isSearched)
-            {
-                this.listAdd.Items.Add("不存在此人");
-            }
-            readerUID.Close();
-            mscUID.Close();
         }
+
 
         private void buttonAddFriend_Click(object sender, EventArgs e)
         {
-            string searchFriendUID = this.textAdd.Text;
-            string sqlAddFriend1 = "insert into friend values(@value1,@value2,@value3)";
-            string sqlAddFriend2 = "insert into friend values(@value1,@value2,@value3)";
-            string sqlGetName = "select UserName from userinfo where UID=" + searchFriendUID;
-            MySqlConnection mscaddFriend = new MySqlConnection(connectstring);
-            MySqlCommand cmdAddFriend1 = new MySqlCommand(sqlAddFriend1, mscaddFriend);
-            MySqlCommand cmdAddFriend2 = new MySqlCommand(sqlAddFriend2, mscaddFriend);
-            //获得好友姓名
-            MySqlCommand cmdGetName = new MySqlCommand(sqlGetName, mscaddFriend);
-            mscaddFriend.Open();
-            MySqlDataReader readerName = cmdGetName.ExecuteReader();
-            string UIDName;
-            while (readerName.Read())
+            string searchFriendUID = this.textAdd.Text.Trim();
+            if (string.IsNullOrEmpty(searchFriendUID))
             {
-                UIDName = readerName.GetString(0);
-                readerName.Close();
-                cmdAddFriend1.Parameters.AddWithValue("@value1", Myaccount);
-                cmdAddFriend1.Parameters.AddWithValue("@value2", searchFriendUID);
-                cmdAddFriend1.Parameters.AddWithValue("@value3", UIDName);
-                cmdAddFriend1.ExecuteNonQuery();
-                cmdAddFriend1.Dispose();
-
-                cmdAddFriend2.Parameters.AddWithValue("@value1", searchFriendUID);
-                cmdAddFriend2.Parameters.AddWithValue("@value2", Myaccount);
-                cmdAddFriend2.Parameters.AddWithValue("@value3", name);
-                cmdAddFriend2.ExecuteNonQuery();
-                cmdAddFriend2.Dispose();
-
-                friend.Add(searchFriendUID, UIDName);
-
-                ListViewItem item = new ListViewItem(UIDName);
-                this.listFriend.Items.Add(item);
-
-                break;
+                MessageBox.Show("请输入对方UID");
+                return;
             }
-            mscaddFriend.Close();
+
+            if (searchFriendUID == Myaccount)
+            {
+                MessageBox.Show("不能添加自己为好友");
+                return;
+            }
+
+            try
+            {
+                using (MySqlConnection conn = new MySqlConnection(connectstring))
+                {
+                    conn.Open();
+
+                    // 先检查是否已是好友
+                    string checkSql = "SELECT COUNT(*) FROM friend WHERE Myaccount = @uid AND FriendUID = @friend";
+                    using (MySqlCommand checkCmd = new MySqlCommand(checkSql, conn))
+                    {
+                        checkCmd.Parameters.AddWithValue("@uid", Myaccount);
+                        checkCmd.Parameters.AddWithValue("@friend", searchFriendUID);
+                        int count = Convert.ToInt32(checkCmd.ExecuteScalar());
+                        if (count > 0)
+                        {
+                            MessageBox.Show("已添加为好友");
+                            return;
+                        }
+                    }
+
+                    // 查询对方昵称
+                    string getNameSql = "SELECT UserName FROM userinfo WHERE UID = @uid";
+                    string friendName = "";
+                    using (MySqlCommand cmd = new MySqlCommand(getNameSql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@uid", searchFriendUID);
+                        var reader = cmd.ExecuteReader();
+                        if (reader.Read())
+                        {
+                            friendName = reader.GetString(0);
+                        }
+                        else
+                        {
+                            MessageBox.Show("用户不存在");
+                            return;
+                        }
+                        reader.Close();
+                    }
+
+                    // 添加好友关系（互相）
+                    string insertSql = "INSERT INTO friend (Myaccount, FriendUID, UIDName) VALUES (@uid, @friend, @name)";
+                    using (MySqlCommand insertCmd1 = new MySqlCommand(insertSql, conn))
+                    {
+                        insertCmd1.Parameters.AddWithValue("@uid", Myaccount);
+                        insertCmd1.Parameters.AddWithValue("@friend", searchFriendUID);
+                        insertCmd1.Parameters.AddWithValue("@name", friendName);
+                        insertCmd1.ExecuteNonQuery();
+                    }
+
+                    using (MySqlCommand insertCmd2 = new MySqlCommand(insertSql, conn))
+                    {
+                        insertCmd2.Parameters.AddWithValue("@uid", searchFriendUID);
+                        insertCmd2.Parameters.AddWithValue("@friend", Myaccount);
+                        insertCmd2.Parameters.AddWithValue("@name", MyName);
+                        insertCmd2.ExecuteNonQuery();
+                    }
+
+                    // 本地更新好友
+                    friend.Add(searchFriendUID, friendName);
+                    ListViewItem item = new ListViewItem(friendName);
+                    listFriend.Items.Add(item);
+
+                    // 新建聊天面板
+                    Panel chatBox = new Panel();
+                    chatBox.AutoScroll = true;
+                    chatBox.Name = friendName;
+                    chatBox.BackColor = Color.White;
+                    chatBox.Dock = DockStyle.Fill;
+                    chatBox.Visible = false;
+
+                    string imagePath = @"..\Resources\bkgend.png";
+                    string directoryPath = Path.GetDirectoryName(Application.StartupPath);
+                    string fullPath = Path.Combine(directoryPath, imagePath);
+                    if (File.Exists(fullPath))
+                    {
+                        chatBox.BackgroundImage = Image.FromFile(fullPath);
+                        chatBox.BackgroundImageLayout = ImageLayout.Stretch;
+                    }
+
+                    panelChat.Controls.Add(chatBox);
+
+                    MessageBox.Show("添加好友成功！");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("添加好友失败：" + ex.Message);
+            }
         }
+
+
 
         private void panelChat_Paint(object sender, PaintEventArgs e)
         {

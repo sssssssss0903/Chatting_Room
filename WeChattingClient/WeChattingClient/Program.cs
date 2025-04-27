@@ -8,16 +8,14 @@ namespace WeChattingClient
 {
     static class Program
     {
-        /// <summary>
-        /// 应用程序的主入口点。
-        /// </summary>
-        [STAThread]
+        
+        [STAThread]//单线程单元模型 使用 Windows 窗体和其他 COM 组件（如剪贴板、拖放等）所必需的
         static void Main()
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             LogIn login = new LogIn();
-           // Form1 form1 = new Form1("000001", "3472794392", "郭子浩");
+
             Application.Run(login) ;
         }
     }

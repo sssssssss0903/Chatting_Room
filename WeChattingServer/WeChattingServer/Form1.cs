@@ -35,26 +35,27 @@ namespace WeChattingServer
                     IPEndPoint clientEP = new IPEndPoint(IPAddress.Any, 0);
                     byte[] receiveBytes = server.Receive(ref clientEP);
                     Console.WriteLine("新收到消息" + Encoding.UTF8.GetString(receiveBytes));
-                    //接收到的消息
+
                     string receiveMessage = Encoding.UTF8.GetString(receiveBytes);
 
-                    //消息发送给其他用户
-                    //目标地址对象UID 
                     int index = receiveMessage.IndexOf("$");
                     int lastIndex = receiveMessage.LastIndexOf("$");
                     string sendInfo = receiveMessage.Substring(0, index);
-                    //发送者UID 后六个数
-                    string receInfo = receiveMessage.Substring(lastIndex+1);
-                    //要发送的消息（把目标地址UID截取下来了）
-                    string sendMessage = receiveMessage.Remove(0, index+1);
+                    string receInfo = receiveMessage.Substring(lastIndex + 1);
+                    string sendMessage = receiveMessage.Remove(0, index + 1);
                     byte[] sendBytes = Encoding.UTF8.GetBytes(sendMessage);
-                    listServerMessage.Items.Add($"收到来自{clientEP}的消息:{receiveMessage}");
-                    //群聊
+
+                    // ⭐ 改成用Invoke
+                    this.Invoke(new Action(() =>
+                    {
+                        listServerMessage.Items.Add($"收到来自{clientEP}的消息:{receiveMessage}");
+                    }));
+
                     if (sendInfo.Equals("000000"))
                     {
-                        foreach(IPEndPoint ep in clientList)
+                        foreach (IPEndPoint ep in clientList)
                         {
-                            if(ep!=clientEP)
+                            if (ep != clientEP)
                             {
                                 server.Send(sendBytes, sendBytes.Length, ep);
                             }
@@ -62,62 +63,70 @@ namespace WeChattingServer
                     }
                     else
                     {
-                        //初次连接
                         if (sendInfo.Equals("######") && !clientList.Contains(clientEP))
                         {
                             clientList.Add(clientEP);
-                            listServerMessage.Items.Add($"添加新客户端:{clientEP}");
+
+                            this.Invoke(new Action(() =>
+                            {
+                                listServerMessage.Items.Add($"添加新客户端:{clientEP}");
+                            }));
+
                             identify.Add(receInfo, clientEP);
-                            //直接跳过发送过程
                             continue;
-                        }                      
-                        //如果目标地址已知，则直接发过去
-                        /*
-                       * 意外：如果发的时候对方已经关机了怎么办，还是收不到；
-                       * 可改进：若对方还不在其中，则把信息先存起来，等到对方连接后，得到对方的地址再传;
-                       */
+                        }
 
                         IPEndPoint ep;
-                        identify.TryGetValue(sendInfo, out ep);
-                        server.Send(sendBytes, sendBytes.Length, ep);
+                        if (identify.TryGetValue(sendInfo, out ep) && ep != null)
+                        {
+                            server.Send(sendBytes, sendBytes.Length, ep);
+                        }
+                        else
+                        {
+                            // 如果找不到目标ep，可以打印日志或者跳过
+                            this.Invoke(new Action(() =>
+                            {
+                                listServerMessage.Items.Add($"警告：找不到发送对象UID={sendInfo}对应的地址！");
+                            }));
+                        }
                     }
-  
                 }
-            }
-           
-        );
+            });
+
             clearThread = new Thread(() =>
-              {
-                  while (true)
-                  {
-                      Thread.Sleep(10000);
-                      lock(clientList)
-                      {
-                          for(int i=clientList.Count-1;i>=0;i--)
-                          {
-                              IPEndPoint ep = clientList[i];
-                              try
-                              {
-                                  server.Send(new byte[0], 0, ep);
-                              }
-                              catch
-                              {
-                                  listServerMessage.Items.Add($"用户【{ep}】离开聊天室");
-                                  clientList.RemoveAt(i);
-                                  //告诉所有用户ep已经离开聊天室
-                                  byte[] sendBytes = Encoding.UTF8.GetBytes($"用户 {ep} 离开聊天室");
-                                  foreach (IPEndPoint ep2 in clientList)
-                                  {
-                                      server.Send(sendBytes, sendBytes.Length, ep2);
-                                  }
-                              }
-                          }
-                      }
+            {
+                while (true)
+                {
+                    Thread.Sleep(10000);
+                    lock (clientList)
+                    {
+                        for (int i = clientList.Count - 1; i >= 0; i--)
+                        {
+                            IPEndPoint ep = clientList[i];
+                            try
+                            {
+                                server.Send(new byte[0], 0, ep);
+                            }
+                            catch
+                            {
+                                this.Invoke(new Action(() =>
+                                {
+                                    listServerMessage.Items.Add($"用户【{ep}】离开聊天室");
+                                }));
 
-                  }
+                                clientList.RemoveAt(i);
 
+                                byte[] sendBytes = Encoding.UTF8.GetBytes($"用户 {ep} 离开聊天室");
+                                foreach (IPEndPoint ep2 in clientList)
+                                {
+                                    server.Send(sendBytes, sendBytes.Length, ep2);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
 
-              });
             receiveThread.IsBackground = true;
             clearThread.IsBackground = true;
         }
