@@ -53,7 +53,7 @@ namespace WeChattingClient
 
                                 // 登录成功，跳转主界面
                                 Form1 userForm = new Form1(account, password, name);
-                                userForm.ConnectInfo();
+                              
                                 userForm.Show();
                                 this.Hide(); // 隐藏登录窗口
                                 return;

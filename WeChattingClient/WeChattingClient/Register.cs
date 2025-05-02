@@ -110,7 +110,7 @@ namespace WeChattingClient
                         MessageBox.Show("注册成功，但创建聊天表失败：" + innerEx.Message, "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         // 跳转主界面
                         Form1 userForm = new Form1(uid, pwd1, name);
-                        userForm.ConnectInfo();
+                     
                         userForm.Show();
                         this.Hide();
                         return;
@@ -121,7 +121,7 @@ namespace WeChattingClient
 
                     // 跳转到聊天窗口
                     Form1 userFormFinal = new Form1(uid, pwd1, name);
-                    userFormFinal.ConnectInfo();
+                  
                     userFormFinal.Show();
                     this.Hide();
                 }
