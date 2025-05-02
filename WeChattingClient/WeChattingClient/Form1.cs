@@ -772,5 +772,37 @@ namespace WeChattingClient
         {
 
         }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        public void uploadFile()
+        {
+            OpenFileDialog dialog = new OpenFileDialog();
+            dialog.Multiselect = false;//该值确定是否可以选择多个文件
+            dialog.Title = "请选择文件夹";
+            dialog.Filter = "所有文件(*.*)|*.*";
+            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                string file = dialog.FileName;
+                textBox1.Text = file;
+            } else
+            {
+                MessageBox.Show("选择文件失败");
+            }
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            uploadFile();
+
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+
+        }
     }
 }
