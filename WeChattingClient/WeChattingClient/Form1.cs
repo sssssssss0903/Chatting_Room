@@ -199,74 +199,15 @@ namespace WeChattingClient
                             Panel panelReceive = panelChat.Controls.Find(friendName, false).FirstOrDefault() as Panel;
                             if (panelReceive == null) return;
 
-                            int controlIndex = 0;
+                            panelReceive.Controls.Clear(); // 清除旧控件，避免重复加载
 
                             while (reader.Read())
                             {
                                 string sender = reader.GetString("sender");
-                                string receiver = reader.GetString("receiver");
                                 string message = reader.GetString("message");
                                 DateTime sendTime = reader.GetDateTime("send_time");
 
-                                // === 时间标签 ===
-                                Label timeLabel = new Label();
-                                timeLabel.Text = $"[{sendTime:yyyy-MM-dd HH:mm:ss}]";
-                                timeLabel.AutoSize = true;
-                                timeLabel.Font = new Font("Arial", 9, FontStyle.Italic);
-                                timeLabel.ForeColor = Color.White;
-                                timeLabel.BackColor = Color.Gray;
-                                timeLabel.Padding = new Padding(6, 2, 6, 2);
-                                timeLabel.TextAlign = ContentAlignment.MiddleCenter;
-                                timeLabel.Left = (panelReceive.Width - timeLabel.PreferredWidth) / 2;
-                                timeLabel.Top = controlIndex * 70;
-
-                                panelReceive.Controls.Add(timeLabel);
-
-                                // === 消息框 ===
-                                TextBox textBox = new TextBox();
-                                textBox.Multiline = true;
-                                textBox.ReadOnly = true;
-                                textBox.BorderStyle = BorderStyle.None;
-                                textBox.Font = new Font("Arial", 12, FontStyle.Bold);
-                                textBox.Width = panelReceive.Width / 3;
-
-                                string senderDisplayName = sender;
-                                if (friend.ContainsKey(sender))
-                                {
-                                    senderDisplayName += $"（{friend[sender]}）";
-                                }
-                                string showText = (friendName == "群聊")
-                               ? (sender == Myaccount ? message : $"{senderDisplayName}: {message}")
-                               : message;
-
-                                textBox.Text = showText;
-
-                                int baseHeight = textBox.Font.Height;
-                                int lineCount = showText.Split('\n').Length;
-                                lineCount += showText.Length / (textBox.Width / 10);
-                                textBox.Height = Math.Max(baseHeight * lineCount + 10, 50);
-
-                                textBox.Top = timeLabel.Top + timeLabel.Height + 5;
-
-                                if (sender == Myaccount)
-                                {
-                                    textBox.BackColor = Color.LightBlue;
-                                    textBox.TextAlign = HorizontalAlignment.Left;
-                                    textBox.Left = panelReceive.Width - textBox.Width - 5;
-                                    textBox.ForeColor = Color.LightCoral;
-                                }
-                                else
-                                {
-                                    textBox.BackColor = Color.LightGreen;
-                                    textBox.TextAlign = HorizontalAlignment.Left;
-                                    textBox.Left = 5;
-                                    textBox.ForeColor = Color.Black;
-                                }
-
-                                panelReceive.Controls.Add(textBox);
-
-                                // 更新下一个 Top 的基准（每组时间+消息 高度 = 70 左右）
-                                controlIndex++;
+                                AddMessageToPanel(friendName, sender, message, sendTime);
                             }
                         }
                     }
@@ -305,7 +246,6 @@ namespace WeChattingClient
                         string senderUID = receiveMessage.Substring(first + 1, second - first - 1);
                         string receiverUID = receiveMessage.Substring(second + 1);
 
-                        // 获取显示名（群聊用固定值）
                         string displayName = (receiverUID == "000000")
                             ? "群聊"
                             : (senderUID == Myaccount
@@ -314,86 +254,29 @@ namespace WeChattingClient
 
                         this.Invoke(new Action(() =>
                         {
-                            // 定义 senderDisplayName 在全作用域中可用
-                        
-                            string senderDisplayName = senderUID;
-                            string name = friend.ContainsKey(senderUID) ? friend[senderUID] : GetUserNameByUID(senderUID);
-                            senderDisplayName += $"（{name}）";
-
-
-                            // 获取或创建聊天面板
+                            // 如果面板不存在，创建面板
                             Control[] chatBoxes = panelChat.Controls.Find(displayName, false);
                             if (chatBoxes.Length == 0)
                             {
                                 ShowChatBox(displayName);
-                                chatBoxes = panelChat.Controls.Find(displayName, false);
                             }
 
-                            Panel panelReceive = (Panel)chatBoxes[0];
-
-                            // 是否当前聊天窗口
+                            // 当前是否在该聊天窗口
                             if (displayName == listFriend.SelectedItems[0].Text)
                             {
-                                int controlCount = panelReceive.Controls.Count;
-
-                                // === 时间标签 ===
-                                Label timeLabel = new Label();
-                                timeLabel.Text = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}]";
-                                timeLabel.AutoSize = true;
-                                timeLabel.Font = new Font("Arial", 9, FontStyle.Italic);
-                                timeLabel.ForeColor = Color.White;
-                                timeLabel.BackColor = Color.Gray;
-                                timeLabel.Padding = new Padding(6, 2, 6, 2);
-                                timeLabel.TextAlign = ContentAlignment.MiddleCenter;
-                                timeLabel.Left = (panelReceive.Width - timeLabel.PreferredWidth) / 2;
-                                timeLabel.Top = controlCount * 70;
-
-                                panelReceive.Controls.Add(timeLabel);
-
-                                // === 消息框 ===
-                                TextBox textBox = new TextBox();
-                                textBox.Multiline = true;
-                                textBox.ReadOnly = true;
-                                textBox.BorderStyle = BorderStyle.None;
-                                textBox.Font = new Font("Arial", 12, FontStyle.Regular);
-                                textBox.Width = panelReceive.Width / 3;
-
-                                // 控制显示文本逻辑
-                                string showText = (receiverUID == "000000")
-                                    ? (senderUID == Myaccount ? message : $"{senderDisplayName}: {message}")
-                                    : message;
-
-                                textBox.Text = showText;
-
-                                int baseHeight = textBox.Font.Height;
-                                int lineCount = showText.Split('\n').Length;
-                                lineCount += showText.Length / (textBox.Width / 10);
-                                textBox.Height = Math.Max(baseHeight * lineCount + 10, 50);
-
-                                textBox.Top = timeLabel.Top + timeLabel.Height + 5;
-
-                                if (senderUID == Myaccount)
-                                {
-                                    textBox.BackColor = Color.LightBlue;
-                                    textBox.TextAlign = HorizontalAlignment.Left;
-                                    textBox.Left = panelReceive.Width - textBox.Width - 5;
-                                    textBox.ForeColor = Color.LightCoral;
-                                }
-                                else
-                                {
-                                    textBox.BackColor = Color.LightGreen;
-                                    textBox.TextAlign = HorizontalAlignment.Left;
-                                    textBox.Left = 5;
-                                    textBox.ForeColor = Color.Black;
-                                }
-
-                                panelReceive.Controls.Add(textBox);
+                                AddMessageToPanel(displayName, senderUID, message, DateTime.Now);
                             }
                             else
                             {
-                                // 非当前窗口，缓存到 friendChatInfo
+                                // 非当前窗口，缓存消息
                                 if (!friendChatInfo.ContainsKey(displayName))
                                     friendChatInfo[displayName] = "";
+
+                                string senderDisplayName = senderUID;
+                                if (friend.ContainsKey(senderUID))
+                                {
+                                    senderDisplayName += $"（{friend[senderUID]}）";
+                                }
 
                                 string cachedText = (receiverUID == "000000")
                                     ? (senderUID == Myaccount ? message : $"{senderDisplayName}: {message}")
@@ -420,6 +303,73 @@ namespace WeChattingClient
                 }
             }
         }
+
+        #endregion
+
+        private void AddMessageToPanel(string friendName, string senderUID, string message, DateTime time)
+        {
+            Panel panelReceive = panelChat.Controls.Find(friendName, false).FirstOrDefault() as Panel;
+            if (panelReceive == null) return;
+
+            int currentY = panelReceive.Controls.Count > 0
+                ? panelReceive.Controls.Cast<Control>().Max(c => c.Bottom) + 10
+                : 10;
+
+            // === 时间标签 ===
+            Label timeLabel = new Label();
+            timeLabel.Text = $"[{time:yyyy-MM-dd HH:mm:ss}]";
+            timeLabel.AutoSize = true;
+            timeLabel.Font = new Font("Arial", 9, FontStyle.Italic);
+            timeLabel.ForeColor = Color.White;
+            timeLabel.BackColor = Color.Gray;
+            timeLabel.Padding = new Padding(6, 2, 6, 2);
+            timeLabel.TextAlign = ContentAlignment.MiddleCenter;
+            timeLabel.Left = (panelReceive.Width - timeLabel.PreferredWidth) / 2;
+            timeLabel.Top = currentY;
+
+            panelReceive.Controls.Add(timeLabel);
+            currentY += timeLabel.Height + 5;
+
+            // === 显示消息框 ===
+            TextBox textBox = new TextBox();
+            textBox.Multiline = true;
+            textBox.ReadOnly = true;
+            textBox.BorderStyle = BorderStyle.None;
+            textBox.Font = new Font("Arial", 11, FontStyle.Bold);
+            textBox.BackColor = senderUID == Myaccount ? Color.LightBlue : Color.LightGreen;
+            textBox.ForeColor = senderUID == Myaccount ? Color.LightCoral : Color.Black;
+            textBox.TextAlign = HorizontalAlignment.Left;
+
+            // 显示文本内容（群聊则显示发送人）
+            string displayText = message;
+            if (friendName == "群聊" && senderUID != Myaccount)
+            {
+                string name = friend.ContainsKey(senderUID) ? friend[senderUID] : GetUserNameByUID(senderUID);
+                displayText = $"{senderUID}（{name}）\r\n{message}";
+            }
+
+            textBox.Text = displayText;
+
+            // 宽度设置为 50~60%（最多不超过宽度的一半），自动换行
+            int maxWidth = panelReceive.Width * 3 / 5;
+            textBox.Width = maxWidth;
+
+            // 估算高度
+            int lineCount = displayText.Split('\n').Length + displayText.Length / (textBox.Width / 10);
+            int baseHeight = textBox.Font.Height;
+            textBox.Height = Math.Max(baseHeight * lineCount + 10, 50);
+
+            textBox.Top = currentY;
+            textBox.Left = senderUID == Myaccount
+                ? panelReceive.Width - textBox.Width - 10
+                : 10;
+
+            panelReceive.Controls.Add(textBox);
+
+            // 自动滚动到底部
+            panelReceive.ScrollControlIntoView(textBox);
+        }
+
 
         private string GetUserNameByUID(string uid)
         {
@@ -448,8 +398,7 @@ namespace WeChattingClient
             return result;
         }
 
-        #endregion
-
+     
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
@@ -465,9 +414,16 @@ namespace WeChattingClient
             if (string.IsNullOrWhiteSpace(textSend.Text))
                 return;
 
+            string message = textSend.Text.Trim();
+            textSend.Text = "";
+
             try
             {
-                string sendMessage = chatFriend + "$" + textSend.Text + "$" + Myaccount;
+                // 这里 chatFriend 本身就是 UID（从 listFriend 切换时赋值）
+                string receiverUID = chatFriend == "群聊" ? "000000" : chatFriend;
+
+                // ✅ 正确格式
+                string sendMessage = receiverUID + "$" + message + "$" + Myaccount;
                 byte[] sendBytes = Encoding.UTF8.GetBytes(sendMessage);
 
                 if (stream != null && stream.CanWrite)
@@ -480,8 +436,9 @@ namespace WeChattingClient
                     return;
                 }
 
-                // 不再本地显示，等待服务器广播回来的消息
-                textSend.Text = "";
+                // === 本地显示消息 ===
+                string displayName = (receiverUID == "000000") ? "群聊" : friend.ContainsKey(receiverUID) ? friend[receiverUID] : receiverUID;
+                AddMessageToPanel(displayName, Myaccount, message, DateTime.Now);
             }
             catch (Exception ex)
             {
