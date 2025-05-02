@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using MySql.Data.MySqlClient;
+using System.Linq;
+
 namespace WeChattingServer
 {
     public partial class Form1 : Form
@@ -85,9 +87,9 @@ namespace WeChattingServer
                     if (firstIndex == -1 || lastIndex == -1 || firstIndex == lastIndex)
                         continue;
 
-                    string receiverUID = msg.Substring(0, firstIndex);                    // 接收者 UID
+                    string receiverUID = msg.Substring(0, firstIndex);  // 接收者 UID
                     string messageBody = msg.Substring(firstIndex + 1, lastIndex - firstIndex - 1); // 消息内容
-                    string senderUID = msg.Substring(lastIndex + 1);                     // 发送者 UID
+                    string senderUID = msg.Substring(lastIndex + 1);    // 发送者 UID
 
                     this.Invoke(new Action(() =>
                     {
@@ -97,7 +99,84 @@ namespace WeChattingServer
                     string fullMsg = messageBody + "$" + senderUID + "$" + receiverUID;
                     byte[] toSend = Encoding.UTF8.GetBytes(fullMsg);
 
-                    // 保存聊天记录到数据库
+                    // 注册上线消息
+                    if (receiverUID == "######")
+                    {
+                        lock (locker)
+                        {
+                            if (!uidToClient.ContainsKey(senderUID))
+                            {
+                                uidToClient[senderUID] = client;
+
+                                if (!clientList.Contains(client))  // 判重，避免重复添加
+                                    clientList.Add(client);
+
+                                this.Invoke(new Action(() =>
+                                {
+                                    listServerMessage.Items.Add($"新用户上线: {senderUID}");
+                                }));
+                            }
+                            else
+                            {
+                                uidToClient[senderUID] = client;
+
+                                //  再次判断，避免 client 已在 clientList 中
+                                if (!clientList.Contains(client))
+                                    clientList.Add(client);
+                            }
+
+                        }
+                        continue;
+                    }
+
+                    // 群聊消息广播（包括发送者）
+                    if (receiverUID == "000000")
+                    {
+                        lock (locker)
+                        {
+                            foreach (var other in clientList.ToList()) // 避免修改时遍历冲突
+                            {
+                                if (other.Connected)
+                                {
+                                    try
+                                    {
+                                        other.GetStream().Write(toSend, 0, toSend.Length);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine("群聊发送失败: " + ex.Message);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // 私聊转发
+                        lock (locker)
+                        {
+                            if (uidToClient.TryGetValue(receiverUID, out TcpClient targetClient) && targetClient.Connected)
+                            {
+                                try
+                                {
+                                    targetClient.GetStream().Write(toSend, 0, toSend.Length);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine("私聊发送失败: " + ex.Message);
+                                }
+                            }
+                            else
+                            {
+                                this.Invoke(new Action(() =>
+                                {
+                                    listServerMessage.Items.Add($"未找到 UID={receiverUID} 的在线客户端");
+                                }));
+                            }
+                        }
+                    }
+
+                    // 群聊或私聊消息统一保存到数据库
                     try
                     {
                         using (MySqlConnection conn = new MySqlConnection(connStr))
@@ -116,72 +195,6 @@ namespace WeChattingServer
                     catch (Exception ex)
                     {
                         Console.WriteLine("保存消息失败：" + ex.Message);
-                    }
-                    if (receiverUID == "######")
-                    {
-                        // 注册上线消息
-                        lock (locker)
-                        {
-                            if (!uidToClient.ContainsKey(senderUID))
-                            {
-                                uidToClient[senderUID] = client;
-                                clientList.Add(client);
-                                this.Invoke(new Action(() =>
-                                {
-                                    listServerMessage.Items.Add($"新用户上线: {senderUID}");
-                                }));
-                            }
-                            else
-                            {
-                                uidToClient[senderUID] = client; // 更新连接
-                            }
-                        }
-                        continue;
-                    }
-
-                    if (receiverUID == "000000")
-                    {
-                        // 群聊广播（除自己外都发）
-                        lock (locker)
-                        {
-                            foreach (var other in clientList)
-                            {
-                                if (other != client && other.Connected)
-                                {
-                                    try
-                                    {
-                                        other.GetStream().Write(toSend, 0, toSend.Length);
-                                    }
-                                    catch
-                                    {
-
-                                    }
-                                   
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // 私聊
-                        lock (locker)
-                        {
-                            if (uidToClient.TryGetValue(receiverUID, out TcpClient targetClient) && targetClient.Connected)
-                            {
-                                try
-                                {
-                                    targetClient.GetStream().Write(toSend, 0, toSend.Length);
-                                }
-                                catch { }
-                            }
-                            else
-                            {
-                                this.Invoke(new Action(() =>
-                                {
-                                    listServerMessage.Items.Add($" 未找到 UID={receiverUID} 的在线客户端");
-                                }));
-                            }
-                        }
                     }
                 }
             }
