@@ -37,12 +37,13 @@ namespace WeChattingServer
                     Console.WriteLine("新收到消息" + Encoding.UTF8.GetString(receiveBytes));
 
                     string receiveMessage = Encoding.UTF8.GetString(receiveBytes);
-
                     int index = receiveMessage.IndexOf("$");
                     int lastIndex = receiveMessage.LastIndexOf("$");
+
                     string sendInfo = receiveMessage.Substring(0, index);
                     string receInfo = receiveMessage.Substring(lastIndex + 1);
                     string sendMessage = receiveMessage.Remove(0, index + 1);
+
                     byte[] sendBytes = Encoding.UTF8.GetBytes(sendMessage);
 
                     // ⭐ 改成用Invoke

@@ -275,7 +275,7 @@ namespace WeChattingClient
             string sendMessage = chatFriend + "$" + textSend.Text + "$" + Myaccount;
             byte[] sendBytes = Encoding.UTF8.GetBytes(sendMessage);
 
-            client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("10.138.179.108"), 8888));
+            client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8888));
 
             // 写入统一的 chatinfo 表，带发送时间
             try
@@ -349,7 +349,7 @@ namespace WeChattingClient
 
             try
             {
-                client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("10.138.179.108"), 8888));
+                client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8888));
                 listMessage.Items.Add("成功加入聊天");
             }
             catch (Exception ex)
@@ -801,36 +801,20 @@ namespace WeChattingClient
 
         private void button2_Click(object sender, EventArgs e)
         {
-            if (textBox1.Text == "" || File.Exists(textBox1.Text)) return;
+            if (textBox1.Text == "" || File.Exists(textBox1.Text) == false) {
+                MessageBox.Show("文件不存在");
+                return;
+            }
 
             string filePath = textBox1.Text;
             string fileName = Path.GetFileName(filePath);
             byte[] fileData = File.ReadAllBytes(filePath);
-            string sendMessage = chatFriend + "$" + fileName + ":FILE" + "$" + Myaccount;
-            byte[] sendBytes = CombineByteArrays(Encoding.UTF8.GetBytes(sendMessage), fileData);
-
-            if (client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("10.138.179.108"), 8888)) > 0)
+            string sendMessage = chatFriend + "$" + "FILE:" + fileName + "#" + fileData.Length + "#" + Encoding.UTF8.GetString(fileData) + "$" + Myaccount;
+            byte[] sendBytes = Encoding.UTF8.GetBytes(sendMessage);
+            if (client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8888)) > 0)
             {
                 MessageBox.Show("发送成功");
             }
-        }
-
-        public static byte[] CombineByteArrays(byte[] array1, byte[] array2)
-        {
-            if (array1 == null)
-            {
-                return array2 ?? new byte[0]; // Handle null array1
-            }
-            if (array2 == null)
-            {
-                return array1; // Handle null array2
-            }
-
-
-            byte[] combinedArray = new byte[array1.Length + array2.Length];
-            Buffer.BlockCopy(array1, 0, combinedArray, 0, array1.Length);
-            Buffer.BlockCopy(array2, 0, combinedArray, array1.Length, array2.Length);
-            return combinedArray;
         }
 
     }
