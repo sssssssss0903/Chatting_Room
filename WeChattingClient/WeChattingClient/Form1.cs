@@ -797,12 +797,41 @@ namespace WeChattingClient
         private void button1_Click(object sender, EventArgs e)
         {
             uploadFile();
-
         }
 
         private void button2_Click(object sender, EventArgs e)
         {
+            if (textBox1.Text == "" || File.Exists(textBox1.Text)) return;
 
+            string filePath = textBox1.Text;
+            string fileName = Path.GetFileName(filePath);
+            byte[] fileData = File.ReadAllBytes(filePath);
+            string sendMessage = chatFriend + "$" + fileName + ":FILE" + "$" + Myaccount;
+            byte[] sendBytes = CombineByteArrays(Encoding.UTF8.GetBytes(sendMessage), fileData);
+
+            if (client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("10.138.179.108"), 8888)) > 0)
+            {
+                MessageBox.Show("发送成功");
+            }
         }
+
+        public static byte[] CombineByteArrays(byte[] array1, byte[] array2)
+        {
+            if (array1 == null)
+            {
+                return array2 ?? new byte[0]; // Handle null array1
+            }
+            if (array2 == null)
+            {
+                return array1; // Handle null array2
+            }
+
+
+            byte[] combinedArray = new byte[array1.Length + array2.Length];
+            Buffer.BlockCopy(array1, 0, combinedArray, 0, array1.Length);
+            Buffer.BlockCopy(array2, 0, combinedArray, array1.Length, array2.Length);
+            return combinedArray;
+        }
+
     }
 }
