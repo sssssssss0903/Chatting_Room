@@ -275,7 +275,7 @@ namespace WeChattingClient
             string sendMessage = chatFriend + "$" + textSend.Text + "$" + Myaccount;
             byte[] sendBytes = Encoding.UTF8.GetBytes(sendMessage);
 
-            client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("10.138.179.108"), 8888));
+            client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8888));
 
             // 写入统一的 chatinfo 表，带发送时间
             try
@@ -349,7 +349,7 @@ namespace WeChattingClient
 
             try
             {
-                client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("10.138.179.108"), 8888));
+                client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8888));
                 listMessage.Items.Add("成功加入聊天");
             }
             catch (Exception ex)
@@ -772,5 +772,50 @@ namespace WeChattingClient
         {
 
         }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        public void uploadFile()
+        {
+            OpenFileDialog dialog = new OpenFileDialog();
+            dialog.Multiselect = false;//该值确定是否可以选择多个文件
+            dialog.Title = "请选择文件夹";
+            dialog.Filter = "所有文件(*.*)|*.*";
+            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                string file = dialog.FileName;
+                textBox1.Text = file;
+            } else
+            {
+                MessageBox.Show("选择文件失败");
+            }
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            uploadFile();
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            if (textBox1.Text == "" || File.Exists(textBox1.Text) == false) {
+                MessageBox.Show("文件不存在");
+                return;
+            }
+
+            string filePath = textBox1.Text;
+            string fileName = Path.GetFileName(filePath);
+            byte[] fileData = File.ReadAllBytes(filePath);
+            string sendMessage = chatFriend + "$" + "FILE:" + fileName + "#" + fileData.Length + "#" + Encoding.UTF8.GetString(fileData) + "$" + Myaccount;
+            byte[] sendBytes = Encoding.UTF8.GetBytes(sendMessage);
+            if (client.Send(sendBytes, sendBytes.Length, new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8888)) > 0)
+            {
+                MessageBox.Show("发送成功");
+            }
+        }
+
     }
 }
