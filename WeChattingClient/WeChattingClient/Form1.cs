@@ -12,6 +12,8 @@ using System.Net.Sockets;
 using System.Threading;
 using MySql.Data.MySqlClient;
 using System.IO;
+using J3QQ4;
+using Google.Protobuf.WellKnownTypes;
 
 namespace WeChattingClient
 {
@@ -775,7 +777,12 @@ namespace WeChattingClient
 
         private void Form1_Load(object sender, EventArgs e)
         {
-
+            label1.Text = Emoji.Open_Mouth;
+            label2.Text = Emoji.Hushed;
+            label3.Text = Emoji.Grimacing;
+            label4.Text = Emoji.Neutral_Face;
+            label5.Text = Emoji.Sunglasses;
+            label6.Text = Emoji.Angry;
         }
 
         public void uploadFile()
@@ -816,6 +823,34 @@ namespace WeChattingClient
                 MessageBox.Show("发送成功");
             }
         }
+        private void label1_Click_1(object sender, EventArgs e)
+        {
+            textSend.Text += label1.Text;
+        }
 
+        private void label2_Click(object sender, EventArgs e)
+        {
+            textSend.Text += label2.Text;
+        }
+
+        private void label3_Click(object sender, EventArgs e)
+        {
+            textSend.Text += label3.Text;
+        }
+
+        private void label4_Click(object sender, EventArgs e)
+        {
+            textSend.Text += label4.Text;
+        }
+
+        private void label5_Click(object sender, EventArgs e)
+        {
+            textSend.Text += label5.Text;
+        }
+
+        private void label6_Click(object sender, EventArgs e)
+        {
+            textSend.Text += label6.Text;
+        }
     }
 }
