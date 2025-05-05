@@ -74,22 +74,38 @@ namespace WeChattingServer
             {
                 while (true)
                 {
-                    int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                    if (bytesRead == 0)
-                        break;
+                    // === 第一步：读取前4个字节作为长度头 ===
+                    byte[] lengthBuffer = new byte[4];
+                    int lengthRead = stream.Read(lengthBuffer, 0, 4);
+                    if (lengthRead != 4) break; // 客户端断开
 
-                    string msg = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                    int messageLength = BitConverter.ToInt32(lengthBuffer, 0);
+                    if (messageLength <= 0 || messageLength > 10_000_000) break; // 防止恶意数据（最多10MB）
+
+                    // === 第二步：按长度读取消息体 ===
+                    byte[] messageBuffer = new byte[messageLength];
+                    int totalRead = 0;
+                    while (totalRead < messageLength)
+                    {
+                        int read = stream.Read(messageBuffer, totalRead, messageLength - totalRead);
+                        if (read == 0) break; // 客户端断开
+                        totalRead += read;
+                    }
+
+                    if (totalRead != messageLength) break; // 异常中断
+
+                    string msg = Encoding.UTF8.GetString(messageBuffer);
                     Console.WriteLine("收到消息: " + msg);
 
+                    // === 拆分消息 ===
                     int firstIndex = msg.IndexOf("$");
                     int lastIndex = msg.LastIndexOf("$");
-
                     if (firstIndex == -1 || lastIndex == -1 || firstIndex == lastIndex)
                         continue;
 
-                    string receiverUID = msg.Substring(0, firstIndex);  // 接收者 UID
-                    string messageBody = msg.Substring(firstIndex + 1, lastIndex - firstIndex - 1); // 消息内容
-                    string senderUID = msg.Substring(lastIndex + 1);    // 发送者 UID
+                    string receiverUID = msg.Substring(0, firstIndex);
+                    string messageBody = msg.Substring(firstIndex + 1, lastIndex - firstIndex - 1);
+                    string senderUID = msg.Substring(lastIndex + 1);
 
                     // === 注册上线消息（不会转发） ===
                     if (receiverUID == "######")
@@ -119,17 +135,21 @@ namespace WeChattingServer
                         continue;
                     }
 
-                    // === 服务端日志显示 ===
+                    // === 服务端显示 ===
                     this.Invoke(new Action(() =>
                     {
                         listServerMessage.Items.Add($"[来自 {senderUID} 发给 {receiverUID}]：{messageBody}");
                     }));
 
-                    // === 构造要发送给客户端的消息（带 \n） ===
-                    string fullMsg = messageBody + "$" + senderUID + "$" + receiverUID + "\n";
-                    byte[] toSend = Encoding.UTF8.GetBytes(fullMsg);
+                    // === 构造转发消息（带长度头） ===
+                    string forwardMsg = messageBody + "$" + senderUID + "$" + receiverUID;
+                    byte[] forwardBytes = Encoding.UTF8.GetBytes(forwardMsg);
+                    byte[] forwardLength = BitConverter.GetBytes(forwardBytes.Length);
+                    byte[] toSend = new byte[4 + forwardBytes.Length];
+                    Buffer.BlockCopy(forwardLength, 0, toSend, 0, 4);
+                    Buffer.BlockCopy(forwardBytes, 0, toSend, 4, forwardBytes.Length);
 
-                    // === 群聊广播 ===
+                    // === 群聊/私聊 转发 ===
                     if (receiverUID == "000000")
                     {
                         lock (locker)
@@ -152,7 +172,6 @@ namespace WeChattingServer
                     }
                     else
                     {
-                        // === 私聊转发 ===
                         lock (locker)
                         {
                             if (uidToClient.TryGetValue(receiverUID, out TcpClient targetClient) && targetClient.Connected)
@@ -175,7 +194,6 @@ namespace WeChattingServer
                             }
                         }
                     }
-
                     // === 存入数据库 ===
                     try
                     {

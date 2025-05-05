@@ -143,8 +143,14 @@ namespace WeChattingClient
 
             // 发送注册上线信息
             string registerMessage = "######" + "$你好$" + Myaccount;
-            byte[] regBytes = Encoding.UTF8.GetBytes(registerMessage);
-            stream.Write(regBytes, 0, regBytes.Length);
+            byte[] body = Encoding.UTF8.GetBytes(registerMessage);
+            byte[] length = BitConverter.GetBytes(body.Length);
+
+            byte[] toSend = new byte[4 + body.Length];
+            Buffer.BlockCopy(length, 0, toSend, 0, 4);
+            Buffer.BlockCopy(body, 0, toSend, 4, body.Length);
+
+            stream.Write(toSend, 0, toSend.Length);
 
             //轮询获得好友列表
             StartFriendListAutoRefresh();
@@ -226,60 +232,68 @@ namespace WeChattingClient
         #region 接收信息线程
         private void ReceiveMessages()
         {
-            byte[] buffer = new byte[4096];
-            StringBuilder messageBuilder = new StringBuilder();
-
             Console.WriteLine("[客户端] 接收线程启动");
 
             while (isRunning)
             {
                 try
                 {
-                    if (!stream.DataAvailable)
+                    // === 第一步：读取4字节长度头 ===
+                    byte[] lengthBytes = new byte[4];
+                    int bytesRead = stream.Read(lengthBytes, 0, 4);
+                    if (bytesRead != 4)
                     {
-                        Thread.Sleep(100);
+                        Console.WriteLine("[客户端] 接收长度失败，连接可能关闭");
+                        break;
+                    }
+
+                    int messageLength = BitConverter.ToInt32(lengthBytes, 0);
+                    if (messageLength <= 0 || messageLength > 10_000_000)
+                    {
+                        Console.WriteLine($"[客户端] 非法消息长度: {messageLength}");
+                        break;
+                    }
+
+                    // === 第二步：读取完整消息体 ===
+                    byte[] messageBytes = new byte[messageLength];
+                    int totalRead = 0;
+                    while (totalRead < messageLength)
+                    {
+                        int read = stream.Read(messageBytes, totalRead, messageLength - totalRead);
+                        if (read == 0)
+                        {
+                            Console.WriteLine("[客户端] 服务器断开连接");
+                            break;
+                        }
+                        totalRead += read;
+                    }
+
+                    if (totalRead != messageLength)
+                    {
+                        Console.WriteLine("[客户端] 消息未读完整");
+                        break;
+                    }
+
+                    string fullMessage = Encoding.UTF8.GetString(messageBytes);
+                    Console.WriteLine($"[客户端] 收到消息：{fullMessage}");
+
+                    // === 拆解 message$sender$receiver ===
+                    int first = fullMessage.IndexOf("$");
+                    int second = fullMessage.IndexOf("$", first + 1);
+                    if (first == -1 || second == -1)
+                    {
+                        Console.WriteLine("[客户端] 消息格式错误，缺少$分隔符");
                         continue;
                     }
 
-                    int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                    if (bytesRead > 0)
-                    {
-                        string part = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                        messageBuilder.Append(part);
+                    string message = fullMessage.Substring(0, first);
+                    string senderUID = fullMessage.Substring(first + 1, second - first - 1);
+                    string receiverUID = fullMessage.Substring(second + 1);
 
-                        string full = messageBuilder.ToString();
-                        int newlineIndex;
+                    if (receiverUID == "000000" && senderUID == Myaccount)
+                        continue;
 
-                        // 处理所有完整消息
-                        while ((newlineIndex = full.IndexOf("\n")) != -1)
-                        {
-                            string oneMessage = full.Substring(0, newlineIndex).Trim();  // 一条完整消息
-                            messageBuilder.Remove(0, newlineIndex + 1);  // 移除已处理部分
-                            full = messageBuilder.ToString();
-
-                            Console.WriteLine($"[客户端] 收到消息：{oneMessage}");
-
-                            // 拆解消息：内容$sender$receiver
-                            int first = oneMessage.IndexOf("$");
-                            int second = oneMessage.IndexOf("$", first + 1);
-
-                            if (first == -1 || second == -1) continue;
-
-                            string message = oneMessage.Substring(0, first);
-                            string senderUID = oneMessage.Substring(first + 1, second - first - 1);
-                            string receiverUID = oneMessage.Substring(second + 1);
-
-                            if (receiverUID == "000000" && senderUID == Myaccount)
-                                continue;  // 自己发的群聊就不显示
-
-                            HandleReceivedMessage(message, senderUID, receiverUID);
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("[客户端] 服务器断开连接");
-                        break;
-                    }
+                    HandleReceivedMessage(message, senderUID, receiverUID);
                 }
                 catch (IOException ioEx)
                 {
@@ -288,7 +302,8 @@ namespace WeChattingClient
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("[客户端] 接收异常：" + ex.ToString());
+                    Console.WriteLine("[客户端] 接收异常：" + ex);
+                    break;
                 }
             }
         }
@@ -460,15 +475,26 @@ namespace WeChattingClient
 
             try
             {
-                // 这里 chatFriend 本身就是 UID（从 listFriend 切换时赋值）
+                // 获取 receiverUID
                 string receiverUID = chatFriend == "群聊" ? "000000" : chatFriend;
 
+                // 构造消息格式：receiverUID$message$Myaccount
                 string sendMessage = receiverUID + "$" + message + "$" + Myaccount;
-                byte[] sendBytes = Encoding.UTF8.GetBytes(sendMessage);
+
+                // 转为 UTF8 字节
+                byte[] messageBody = Encoding.UTF8.GetBytes(sendMessage);
+
+                // 构造前4字节长度头
+                byte[] lengthBytes = BitConverter.GetBytes(messageBody.Length);
+
+                // 拼接完整消息 = [长度头] + [内容体]
+                byte[] fullMessage = new byte[4 + messageBody.Length];
+                Buffer.BlockCopy(lengthBytes, 0, fullMessage, 0, 4);
+                Buffer.BlockCopy(messageBody, 0, fullMessage, 4, messageBody.Length);
 
                 if (stream != null && stream.CanWrite)
                 {
-                    stream.Write(sendBytes, 0, sendBytes.Length);
+                    stream.Write(fullMessage, 0, fullMessage.Length);
                 }
                 else
                 {
@@ -476,8 +502,11 @@ namespace WeChattingClient
                     return;
                 }
 
-                // === 本地显示消息 ===
-                string displayName = (receiverUID == "000000") ? "群聊" : friend.ContainsKey(receiverUID) ? friend[receiverUID] : receiverUID;
+                // 本地显示
+                string displayName = (receiverUID == "000000")
+                    ? "群聊"
+                    : (friend.ContainsKey(receiverUID) ? friend[receiverUID] : receiverUID);
+
                 AddMessageToPanel(displayName, Myaccount, message, DateTime.Now);
             }
             catch (Exception ex)
@@ -485,6 +514,7 @@ namespace WeChattingClient
                 MessageBox.Show("发送消息失败：" + ex.Message);
             }
         }
+
 
 
 
@@ -810,15 +840,20 @@ namespace WeChattingClient
                 string filePath = textBox1.Text;
                 string fileName = Path.GetFileName(filePath);
                 byte[] fileData = File.ReadAllBytes(filePath);
-                string base64Data = Convert.ToBase64String(fileData);  // ✔️ 使用 Base64 编码
+                string base64Data = Convert.ToBase64String(fileData);
 
-                // 格式: chatFriend$FILE:fileName#length#base64data$Myaccount
+                // 构造协议字符串
                 string sendMessage = chatFriend + "$" + "FILE:" + fileName + "#" + fileData.Length + "#" + base64Data + "$" + Myaccount;
-                byte[] sendBytes = Encoding.UTF8.GetBytes(sendMessage);
+                byte[] messageBody = Encoding.UTF8.GetBytes(sendMessage);
+                byte[] lengthBytes = BitConverter.GetBytes(messageBody.Length);
+
+                byte[] fullMessage = new byte[4 + messageBody.Length];
+                Buffer.BlockCopy(lengthBytes, 0, fullMessage, 0, 4);
+                Buffer.BlockCopy(messageBody, 0, fullMessage, 4, messageBody.Length);
 
                 if (stream != null && stream.CanWrite)
                 {
-                    stream.Write(sendBytes, 0, sendBytes.Length);
+                    stream.Write(fullMessage, 0, fullMessage.Length);
                     MessageBox.Show("发送成功");
                 }
                 else
@@ -831,6 +866,7 @@ namespace WeChattingClient
                 MessageBox.Show("发送失败：" + ex.Message);
             }
         }
+
 
 
         private void label1_Click_1(object sender, EventArgs e)
