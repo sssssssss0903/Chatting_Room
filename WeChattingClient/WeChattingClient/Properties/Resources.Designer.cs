@@ -19,7 +19,7 @@ namespace WeChattingClient.Properties {
     // 类通过类似于 ResGen 或 Visual Studio 的工具自动生成的。
     // 若要添加或移除成员，请编辑 .ResX 文件，然后重新运行 ResGen
     // (以 /str 作为命令选项)，或重新生成 VS 项目。
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "16.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "17.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class Resources {
@@ -63,6 +63,16 @@ namespace WeChattingClient.Properties {
         /// <summary>
         ///   查找 System.Drawing.Bitmap 类型的本地化资源。
         /// </summary>
+        internal static System.Drawing.Bitmap bkgend {
+            get {
+                object obj = ResourceManager.GetObject("bkgend", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
         internal static System.Drawing.Bitmap denglu {
             get {
                 object obj = ResourceManager.GetObject("denglu", resourceCulture);
@@ -73,39 +83,9 @@ namespace WeChattingClient.Properties {
         /// <summary>
         ///   查找 System.Drawing.Bitmap 类型的本地化资源。
         /// </summary>
-        internal static System.Drawing.Bitmap logbkg {
+        internal static System.Drawing.Bitmap greenbkg {
             get {
-                object obj = ResourceManager.GetObject("logbkg", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
-        /// </summary>
-        internal static System.Drawing.Bitmap logo {
-            get {
-                object obj = ResourceManager.GetObject("logo", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
-        /// </summary>
-        internal static System.Drawing.Bitmap min {
-            get {
-                object obj = ResourceManager.GetObject("min", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
-        /// </summary>
-        internal static System.Drawing.Bitmap quit {
-            get {
-                object obj = ResourceManager.GetObject("quit", resourceCulture);
+                object obj = ResourceManager.GetObject("greenbkg", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -116,76 +96,6 @@ namespace WeChattingClient.Properties {
         internal static System.Drawing.Bitmap zhuce {
             get {
                 object obj = ResourceManager.GetObject("zhuce", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
-        /// </summary>
-        internal static System.Drawing.Bitmap 微信图片_20230530102831 {
-            get {
-                object obj = ResourceManager.GetObject("微信图片_20230530102831", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
-        /// </summary>
-        internal static System.Drawing.Bitmap 微信图片_20230530104352 {
-            get {
-                object obj = ResourceManager.GetObject("微信图片_20230530104352", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
-        /// </summary>
-        internal static System.Drawing.Bitmap 微信图片_20230530105110 {
-            get {
-                object obj = ResourceManager.GetObject("微信图片_20230530105110", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
-        /// </summary>
-        internal static System.Drawing.Bitmap 微信图片_20230530105952 {
-            get {
-                object obj = ResourceManager.GetObject("微信图片_20230530105952", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
-        /// </summary>
-        internal static System.Drawing.Bitmap 微信图片_20230530105952_1_ {
-            get {
-                object obj = ResourceManager.GetObject("微信图片_20230530105952(1)", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
-        /// </summary>
-        internal static System.Drawing.Bitmap 微信图片_20230530105952_1__1_ {
-            get {
-                object obj = ResourceManager.GetObject("微信图片_20230530105952(1)(1)", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
-        /// </summary>
-        internal static System.Drawing.Bitmap 微信图片_20230530110704 {
-            get {
-                object obj = ResourceManager.GetObject("微信图片_20230530110704", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

@@ -29,11 +29,7 @@ namespace WeChattingClient
 
         //是否运行
         private bool isRunning;
-        //是否收到新消息
-        bool receiveNews = false;
-        //收到消息的人的姓名和消息
-        string friendName;
-        string chatInfo;
+
 
         //请求连接数据库
         private static string connectstring = "data source=localhost;database=wechatting;" +
@@ -79,8 +75,8 @@ namespace WeChattingClient
                     }
                 }
 
-                // 若有变化，则更新UI
-                if (!newFriendDict.OrderBy(k => k.Key).SequenceEqual(friend.OrderBy(k => k.Key)))
+                bool friendChanged = !newFriendDict.OrderBy(k => k.Key).SequenceEqual(friend.OrderBy(k => k.Key));
+                if (friendChanged)
                 {
                     friend = newFriendDict;
 
@@ -90,8 +86,13 @@ namespace WeChattingClient
                         ListViewItem item = new ListViewItem(fname);
                         listFriend.Items.Add(item);
                     }
+                }
 
-                    listFriend.Items.Add(new ListViewItem("群聊")); // 确保群聊项也存在
+                // 无论好友是否更新，都确保“群聊”项存在
+                bool hasGroup = listFriend.Items.Cast<ListViewItem>().Any(i => i.Text == "群聊");
+                if (!hasGroup)
+                {
+                    listFriend.Items.Add(new ListViewItem("群聊"));
                 }
             }
             catch (Exception ex)
@@ -125,6 +126,10 @@ namespace WeChattingClient
         public Form1()
         {
             InitializeComponent();
+            // 禁止改变窗体大小
+            this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            this.MaximizeBox = false;
+         
         }
         #region 带参构造函数
         public Form1(string myaccount, string mypassword, string myname)
@@ -573,7 +578,7 @@ namespace WeChattingClient
             {
                 // 创建新的聊天框
                 Panel chatBox = new Panel();
-                chatBox.AutoScroll = true;
+                
                 chatBox.Name = friendName;
                 chatBox.BackColor = Color.White;
                 chatBox.Dock = DockStyle.Fill;
@@ -590,7 +595,9 @@ namespace WeChattingClient
 
                 curPanel = chatBox;
                 panelChat.Controls.Add(chatBox);
-
+                chatBox.HorizontalScroll.Maximum = 0;
+                chatBox.HorizontalScroll.Visible = false;
+                chatBox.AutoScroll = true;
                 //  新建完后，加载聊天历史
                 LoadHistoryMessages(friendName);
             }
@@ -800,7 +807,7 @@ namespace WeChattingClient
             // 去掉灰线 + 设置背景透明一致
 
             listAdd.BorderStyle = BorderStyle.None;
-            listAdd.BackColor = this.BackColor; // 或 Color.White
+            listAdd.BackColor = this.BackColor; 
             listAdd.ForeColor = Color.Black;
             listAdd.Font = new Font("微软雅黑", 10);
 
@@ -897,6 +904,21 @@ namespace WeChattingClient
         private void label6_Click(object sender, EventArgs e)
         {
             textSend.Text += label6.Text;
+        }
+
+        private void listMessage_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void textBox1_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void labelAdd_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }

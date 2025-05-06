@@ -174,43 +174,16 @@
     <Folder Include="AppData\" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resources\logbkg.jpeg" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\logo.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\min.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\quit.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\微信图片_20230530102831.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\微信图片_20230530104352.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\微信图片_20230530105110.jpg" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\微信图片_20230530105952.png" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="Resources\bkgend.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\微信图片_20230530110704.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\微信图片_20230530105952%281%29%281%29.png" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\zhuce.png" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\denglu.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Resources\greenbkg.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

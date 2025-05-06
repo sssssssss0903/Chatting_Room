@@ -118,43 +118,16 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
-  <data name="quit" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\quit.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="logo" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\logo.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="微信图片_20230530104352" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\微信图片_20230530104352.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="微信图片_20230530102831" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\微信图片_20230530102831.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="微信图片_20230530105952(1)" type="System.Resources.ResXFileRef, System.Windows.Forms">
+  <data name="bkgend" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\bkgend.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="微信图片_20230530110704" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\微信图片_20230530110704.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="微信图片_20230530105952" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\微信图片_20230530105952.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="微信图片_20230530105110" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\微信图片_20230530105110.jpg;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="zhuce" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\zhuce.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="微信图片_20230530105952(1)(1)" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\微信图片_20230530105952(1)(1).png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="min" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\min.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="logbkg" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\logbkg.jpeg;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
   <data name="denglu" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\denglu.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="greenbkg" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\greenbkg.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
 </root>

@@ -13,6 +13,9 @@ namespace WeChattingClient
             InitializeComponent();
             this.FormClosing += Register_FormClosing;
             GenerateUniqueUID(); // 自动生成不重复UID
+                                 
+            this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            this.MaximizeBox = false;
         }
 
         private void Register_FormClosing(object sender, FormClosingEventArgs e)
@@ -89,32 +92,7 @@ namespace WeChattingClient
                         cmdInsert.ExecuteNonQuery();
                     }
 
-                    // 创建聊天表
-                    string chatTableName = $"chatinfo_{uid}";
-                    string createTableSql = $@"
-                        CREATE TABLE IF NOT EXISTS `{chatTableName}` (
-                            sender VARCHAR(50),
-                            receiver VARCHAR(50),
-                            message VARCHAR(250) CHARACTER SET utf8
-                        )";
-                    try
-                    {
-                        using (MySqlCommand cmdCreate = new MySqlCommand(createTableSql, conn))
-                        {
-                            cmdCreate.ExecuteNonQuery();
-                        }
-                    }
-                    catch (Exception innerEx)
-                    {
-                        // 即使创建失败，也不影响登录，只提醒
-                        MessageBox.Show("注册成功，但创建聊天表失败：" + innerEx.Message, "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        // 跳转主界面
-                        Form1 userForm = new Form1(uid, pwd1, name);
-
-                        userForm.Show();
-                        this.Hide();
-                        return;
-                    }
+                  
 
                     // 注册与建表都成功才提示
                     MessageBox.Show("注册成功！", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);

@@ -11,8 +11,10 @@ namespace WeChattingClient
             "user id=root;password=123456;pooling=true;charset=utf8;";
 
         public LogIn()
-        {
+        {   
             InitializeComponent();
+            this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            this.MaximizeBox = false;
         }
 
         // 登录按钮点击事件
@@ -74,7 +76,7 @@ namespace WeChattingClient
 
         // 注册按钮点击事件：跳转注册页面
         private void buttonRegister_Click(object sender, EventArgs e)
-        {
+        { 
             Register registerForm = new Register();
             registerForm.Show();
             this.Hide();
