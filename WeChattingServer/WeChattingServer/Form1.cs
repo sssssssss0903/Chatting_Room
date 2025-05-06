@@ -110,28 +110,24 @@ namespace WeChattingServer
                     // === 注册上线消息（不会转发） ===
                     if (receiverUID == "######")
                     {
+                        bool isNew;
+
                         lock (locker)
                         {
-                            if (!uidToClient.ContainsKey(senderUID))
-                            {
-                                uidToClient[senderUID] = client;
-
-                                if (!clientList.Contains(client))
-                                    clientList.Add(client);
-
-                                this.Invoke(new Action(() =>
-                                {
-                                    listServerMessage.Items.Add($"新用户上线: {senderUID}");
-                                }));
-                            }
-                            else
-                            {
-                                uidToClient[senderUID] = client;
-
-                                if (!clientList.Contains(client))
-                                    clientList.Add(client);
-                            }
+                            isNew = !uidToClient.ContainsKey(senderUID);
+                            uidToClient[senderUID] = client;
+                            if (!clientList.Contains(client))
+                                clientList.Add(client);
                         }
+
+                        // 这里已经脱离 lock 范围，可以放心调用 Invoke
+                        this.Invoke(new Action(() =>
+                        {
+                            if (isNew)
+                                listServerMessage.Items.Add($"新用户上线: {senderUID}");
+
+                            UpdateOnlineUsers(); 
+                        }));
                         continue;
                     }
 
@@ -223,10 +219,11 @@ namespace WeChattingServer
             finally
             {
                 client.Close();
+                string removeUID = null;
+
                 lock (locker)
                 {
                     clientList.Remove(client);
-                    string removeUID = null;
 
                     foreach (var kvp in uidToClient)
                     {
@@ -240,12 +237,19 @@ namespace WeChattingServer
                     if (removeUID != null)
                     {
                         uidToClient.Remove(removeUID);
-                        this.Invoke(new Action(() =>
-                        {
-                            listServerMessage.Items.Add($"用户 {removeUID} 断开连接");
-                        }));
                     }
                 }
+
+                // 在 lock 外调用 UI 更新，避免死锁
+                if (removeUID != null)
+                {
+                    this.Invoke(new Action(() =>
+                    {
+                        listServerMessage.Items.Add($"用户 {removeUID} 断开连接");
+                        UpdateOnlineUsers();
+                    }));
+                }
+
             }
         }
 
@@ -255,6 +259,47 @@ namespace WeChattingServer
         {
             server?.Stop();
             listenThread?.Abort();
+        }
+
+
+        private void UpdateOnlineUsers()
+        {
+            List<string> currentUIDs;
+            lock (locker)
+            {
+                currentUIDs = uidToClient.Keys.ToList();
+            }
+
+            try
+            {
+                this.Invoke(new Action(() =>
+                {
+                    listOnlineUsers.Items.Clear();
+                    foreach (var uid in currentUIDs)
+                    {
+                        listOnlineUsers.Items.Add(uid);
+                    }
+                }));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("更新在线用户失败：" + ex.Message);
+            }
+        }
+
+        private void listOnlineUsers_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void label2_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }
