@@ -44,9 +44,10 @@ namespace WeChattingServer
             this.label1.Location = new System.Drawing.Point(243, 14);
             this.label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(706, 24);
+            this.label1.Size = new System.Drawing.Size(730, 24);
             this.label1.TabIndex = 0;
-            this.label1.Text = "欢迎来到WeChatting的服务端，在这里您能监视到所有用户的聊天";
+            this.label1.Text = "欢迎来到ChattingRoom的服务端，在这里您能监视到所有用户的聊天";
+            this.label1.Click += new System.EventHandler(this.label1_Click);
             // 
             // textServerPort
             // 

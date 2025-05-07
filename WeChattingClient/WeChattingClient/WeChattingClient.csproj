@@ -104,6 +104,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DbConfig.cs" />
     <Compile Include="Emoji.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
@@ -183,7 +184,14 @@
     <None Include="Resources\denglu.png" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="client_config.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\default_avatar.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Resources\greenbkg.png" />
+    <None Include="Resources\group_avatar.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

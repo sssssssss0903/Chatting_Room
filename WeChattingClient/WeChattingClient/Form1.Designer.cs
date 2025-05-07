@@ -51,6 +51,12 @@ namespace WeChattingClient
             this.label4 = new System.Windows.Forms.Label();
             this.label5 = new System.Windows.Forms.Label();
             this.label6 = new System.Windows.Forms.Label();
+            this.pictureBoxAvatar = new System.Windows.Forms.PictureBox();
+            this.label7 = new System.Windows.Forms.Label();
+            this.button3 = new System.Windows.Forms.Button();
+            this.button4 = new System.Windows.Forms.Button();
+            this.button5 = new System.Windows.Forms.Button();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxAvatar)).BeginInit();
             this.SuspendLayout();
             // 
             // textSend
@@ -77,13 +83,11 @@ namespace WeChattingClient
             // 
             // listFriend
             // 
-            this.listFriend.AllowDrop = true;
             this.listFriend.BackColor = System.Drawing.Color.DarkSeaGreen;
-            this.listFriend.BackgroundImageTiled = true;
             this.listFriend.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnHeader1});
             this.listFriend.Dock = System.Windows.Forms.DockStyle.Left;
-            this.listFriend.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.listFriend.Font = new System.Drawing.Font("微软雅黑", 12F);
             this.listFriend.ForeColor = System.Drawing.SystemColors.MenuHighlight;
             this.listFriend.HideSelection = false;
             this.listFriend.Location = new System.Drawing.Point(0, 0);
@@ -91,7 +95,6 @@ namespace WeChattingClient
             this.listFriend.Name = "listFriend";
             this.listFriend.Size = new System.Drawing.Size(236, 1016);
             this.listFriend.TabIndex = 10;
-            this.listFriend.UseCompatibleStateImageBehavior = false;
             this.listFriend.View = System.Windows.Forms.View.Details;
             this.listFriend.SelectedIndexChanged += new System.EventHandler(this.listFriend_SelectedIndexChanged);
             // 
@@ -108,26 +111,27 @@ namespace WeChattingClient
             this.panelChat.Location = new System.Drawing.Point(236, 0);
             this.panelChat.Margin = new System.Windows.Forms.Padding(4);
             this.panelChat.Name = "panelChat";
-            this.panelChat.Size = new System.Drawing.Size(990, 773);
+            this.panelChat.Size = new System.Drawing.Size(963, 773);
             this.panelChat.TabIndex = 11;
             this.panelChat.Paint += new System.Windows.Forms.PaintEventHandler(this.panelChat_Paint);
             // 
             // buttonAdd
             // 
-            this.buttonAdd.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.buttonAdd.Location = new System.Drawing.Point(1058, 791);
+            this.buttonAdd.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.buttonAdd.Location = new System.Drawing.Point(1058, 788);
             this.buttonAdd.Margin = new System.Windows.Forms.Padding(4);
             this.buttonAdd.Name = "buttonAdd";
-            this.buttonAdd.Size = new System.Drawing.Size(168, 60);
+            this.buttonAdd.Size = new System.Drawing.Size(178, 61);
             this.buttonAdd.TabIndex = 12;
             this.buttonAdd.Text = "添加好友";
             this.buttonAdd.UseVisualStyleBackColor = true;
             this.buttonAdd.Click += new System.EventHandler(this.buttonAdd_Click);
+
             // 
             // textAdd
             // 
             this.textAdd.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.textAdd.Location = new System.Drawing.Point(1417, 110);
+            this.textAdd.Location = new System.Drawing.Point(1364, 310);
             this.textAdd.Margin = new System.Windows.Forms.Padding(4);
             this.textAdd.Name = "textAdd";
             this.textAdd.Size = new System.Drawing.Size(169, 50);
@@ -140,7 +144,7 @@ namespace WeChattingClient
             this.labelAdd.AutoSize = true;
             this.labelAdd.BackColor = System.Drawing.Color.DarkSeaGreen;
             this.labelAdd.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.labelAdd.Location = new System.Drawing.Point(1270, 119);
+            this.labelAdd.Location = new System.Drawing.Point(1207, 319);
             this.labelAdd.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.labelAdd.Name = "labelAdd";
             this.labelAdd.Size = new System.Drawing.Size(139, 41);
@@ -152,7 +156,7 @@ namespace WeChattingClient
             // buttonSureAdd
             // 
             this.buttonSureAdd.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.buttonSureAdd.Location = new System.Drawing.Point(1277, 180);
+            this.buttonSureAdd.Location = new System.Drawing.Point(1204, 382);
             this.buttonSureAdd.Margin = new System.Windows.Forms.Padding(4);
             this.buttonSureAdd.Name = "buttonSureAdd";
             this.buttonSureAdd.Size = new System.Drawing.Size(116, 60);
@@ -167,17 +171,17 @@ namespace WeChattingClient
             this.listAdd.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.listAdd.FormattingEnabled = true;
             this.listAdd.ItemHeight = 41;
-            this.listAdd.Location = new System.Drawing.Point(1268, 266);
+            this.listAdd.Location = new System.Drawing.Point(1207, 450);
             this.listAdd.Margin = new System.Windows.Forms.Padding(4);
             this.listAdd.Name = "listAdd";
-            this.listAdd.Size = new System.Drawing.Size(295, 414);
+            this.listAdd.Size = new System.Drawing.Size(295, 250);
             this.listAdd.TabIndex = 16;
             this.listAdd.Visible = false;
             // 
             // buttonReturn
             // 
             this.buttonReturn.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.buttonReturn.Location = new System.Drawing.Point(1417, 180);
+            this.buttonReturn.Location = new System.Drawing.Point(1342, 382);
             this.buttonReturn.Margin = new System.Windows.Forms.Padding(4);
             this.buttonReturn.Name = "buttonReturn";
             this.buttonReturn.Size = new System.Drawing.Size(108, 60);
@@ -190,7 +194,7 @@ namespace WeChattingClient
             // buttonAddFriend
             // 
             this.buttonAddFriend.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.buttonAddFriend.Location = new System.Drawing.Point(1058, 793);
+            this.buttonAddFriend.Location = new System.Drawing.Point(1058, 788);
             this.buttonAddFriend.Margin = new System.Windows.Forms.Padding(4);
             this.buttonAddFriend.Name = "buttonAddFriend";
             this.buttonAddFriend.Size = new System.Drawing.Size(178, 61);
@@ -213,7 +217,7 @@ namespace WeChattingClient
             // button1
             // 
             this.button1.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.button1.Location = new System.Drawing.Point(867, 867);
+            this.button1.Location = new System.Drawing.Point(867, 873);
             this.button1.Margin = new System.Windows.Forms.Padding(4);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(168, 56);
@@ -239,7 +243,7 @@ namespace WeChattingClient
             this.label1.AutoSize = true;
             this.label1.BackColor = System.Drawing.Color.White;
             this.label1.Font = new System.Drawing.Font("宋体", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.label1.Location = new System.Drawing.Point(1250, 740);
+            this.label1.Location = new System.Drawing.Point(1250, 791);
             this.label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(111, 33);
@@ -252,7 +256,7 @@ namespace WeChattingClient
             this.label2.AutoSize = true;
             this.label2.BackColor = System.Drawing.Color.White;
             this.label2.Font = new System.Drawing.Font("宋体", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.label2.Location = new System.Drawing.Point(1388, 740);
+            this.label2.Location = new System.Drawing.Point(1358, 791);
             this.label2.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(111, 33);
@@ -265,7 +269,7 @@ namespace WeChattingClient
             this.label3.AutoSize = true;
             this.label3.BackColor = System.Drawing.Color.White;
             this.label3.Font = new System.Drawing.Font("宋体", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.label3.Location = new System.Drawing.Point(1250, 799);
+            this.label3.Location = new System.Drawing.Point(1250, 844);
             this.label3.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(111, 33);
@@ -278,7 +282,7 @@ namespace WeChattingClient
             this.label4.AutoSize = true;
             this.label4.BackColor = System.Drawing.Color.White;
             this.label4.Font = new System.Drawing.Font("宋体", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.label4.Location = new System.Drawing.Point(1388, 799);
+            this.label4.Location = new System.Drawing.Point(1358, 844);
             this.label4.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label4.Name = "label4";
             this.label4.Size = new System.Drawing.Size(111, 33);
@@ -291,7 +295,7 @@ namespace WeChattingClient
             this.label5.AutoSize = true;
             this.label5.BackColor = System.Drawing.Color.White;
             this.label5.Font = new System.Drawing.Font("宋体", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.label5.Location = new System.Drawing.Point(1250, 858);
+            this.label5.Location = new System.Drawing.Point(1250, 896);
             this.label5.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label5.Name = "label5";
             this.label5.Size = new System.Drawing.Size(111, 33);
@@ -304,7 +308,7 @@ namespace WeChattingClient
             this.label6.AutoSize = true;
             this.label6.BackColor = System.Drawing.Color.White;
             this.label6.Font = new System.Drawing.Font("宋体", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.label6.Location = new System.Drawing.Point(1388, 858);
+            this.label6.Location = new System.Drawing.Point(1358, 896);
             this.label6.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(111, 33);
@@ -312,13 +316,76 @@ namespace WeChattingClient
             this.label6.Text = "label6";
             this.label6.Click += new System.EventHandler(this.label6_Click);
             // 
+            // pictureBoxAvatar
+            // 
+            this.pictureBoxAvatar.BackColor = System.Drawing.Color.Transparent;
+            this.pictureBoxAvatar.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center;
+            this.pictureBoxAvatar.Image = global::WeChattingClient.Properties.Resources.default_avatar;
+            this.pictureBoxAvatar.Location = new System.Drawing.Point(1204, 0);
+            this.pictureBoxAvatar.Name = "pictureBoxAvatar";
+            this.pictureBoxAvatar.Size = new System.Drawing.Size(180, 195);
+            this.pictureBoxAvatar.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
+            this.pictureBoxAvatar.TabIndex = 28;
+            this.pictureBoxAvatar.TabStop = false;
+            this.pictureBoxAvatar.Click += new System.EventHandler(this.pictureBoxAvatar_Click);
+            // 
+            // label7
+            // 
+            this.label7.AutoSize = true;
+            this.label7.BackColor = System.Drawing.Color.Transparent;
+            this.label7.Font = new System.Drawing.Font("微软雅黑", 9F);
+            this.label7.Location = new System.Drawing.Point(1406, 75);
+            this.label7.Name = "label7";
+            this.label7.Size = new System.Drawing.Size(82, 31);
+            this.label7.TabIndex = 29;
+            this.label7.Text = "label7";
+            this.label7.Click += new System.EventHandler(this.label7_Click);
+            // 
+            // button3
+            // 
+            this.button3.Font = new System.Drawing.Font("微软雅黑", 10F);
+            this.button3.Location = new System.Drawing.Point(1390, 140);
+            this.button3.Name = "button3";
+            this.button3.Size = new System.Drawing.Size(169, 55);
+            this.button3.TabIndex = 30;
+            this.button3.Text = "记住账号";
+            this.button3.UseVisualStyleBackColor = true;
+            this.button3.Click += new System.EventHandler(this.button3_Click);
+            // 
+            // button4
+            // 
+            this.button4.Font = new System.Drawing.Font("微软雅黑", 10F);
+            this.button4.Location = new System.Drawing.Point(1204, 201);
+            this.button4.Name = "button4";
+            this.button4.Size = new System.Drawing.Size(169, 57);
+            this.button4.TabIndex = 31;
+            this.button4.Text = "修改头像";
+            this.button4.UseVisualStyleBackColor = true;
+            this.button4.Click += new System.EventHandler(this.button4_Click);
+            // 
+            // button5
+            // 
+            this.button5.Font = new System.Drawing.Font("微软雅黑", 10F);
+            this.button5.Location = new System.Drawing.Point(1390, 201);
+            this.button5.Name = "button5";
+            this.button5.Size = new System.Drawing.Size(168, 56);
+            this.button5.TabIndex = 32;
+            this.button5.Text = "退出登录";
+            this.button5.UseVisualStyleBackColor = true;
+            this.button5.Click += new System.EventHandler(this.button5_Click);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 24F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.White;
             this.BackgroundImage = ((System.Drawing.Image)(resources.GetObject("$this.BackgroundImage")));
-            this.ClientSize = new System.Drawing.Size(1609, 1016);
+            this.ClientSize = new System.Drawing.Size(1654, 1016);
+            this.Controls.Add(this.button5);
+            this.Controls.Add(this.button4);
+            this.Controls.Add(this.button3);
+            this.Controls.Add(this.label7);
+            this.Controls.Add(this.pictureBoxAvatar);
             this.Controls.Add(this.label6);
             this.Controls.Add(this.label5);
             this.Controls.Add(this.label4);
@@ -344,6 +411,7 @@ namespace WeChattingClient
             this.Name = "Form1";
             this.Text = "Form1";
             this.Load += new System.EventHandler(this.Form1_Load);
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxAvatar)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -374,6 +442,11 @@ namespace WeChattingClient
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.Label label6;
+        private System.Windows.Forms.PictureBox pictureBoxAvatar;
+        private System.Windows.Forms.Label label7;
+        private System.Windows.Forms.Button button3;
+        private System.Windows.Forms.Button button4;
+        private System.Windows.Forms.Button button5;
     }
 }
 

@@ -1,0 +1,11 @@
+﻿
+<ServerConfig>
+	<Port>8888</Port>
+	<Database>
+		<Host>localhost</Host>
+		<User>root</User>
+		<Password>123456</Password>
+		<Name>wechatting</Name>
+		<Charset>utf8</Charset>
+	</Database>
+</ServerConfig>

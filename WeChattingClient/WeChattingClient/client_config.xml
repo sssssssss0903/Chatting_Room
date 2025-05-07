@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClientConfig>
+	<UID>557969</UID>
+	<Password>123</Password>
+	<Database>
+		<Host>localhost</Host>
+		<Port>3306</Port>
+		<Name>wechatting</Name>
+		<User>root</User>
+		<DbPassword>123456</DbPassword>
+	</Database>
+</ClientConfig>

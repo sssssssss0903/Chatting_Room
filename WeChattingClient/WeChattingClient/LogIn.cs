@@ -1,20 +1,21 @@
 ﻿using System;
+using System.IO;
 using System.Windows.Forms;
+using System.Xml;
 using MySql.Data.MySqlClient;
 
 namespace WeChattingClient
 {
     public partial class LogIn : Form
     {
-        // 连接字符串（连接本地数据库 wechatting）
-        private static readonly string ConnectionString = "server=localhost;database=wechatting;" +
-            "user id=root;password=123456;pooling=true;charset=utf8;";
+        private static string connectstring = DbConfig.GetConnectionString();
 
         public LogIn()
         {   
             InitializeComponent();
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
+            LoadLoginFromXml();
         }
 
         // 登录按钮点击事件
@@ -34,7 +35,7 @@ namespace WeChattingClient
             try
             {
                 // 建立数据库连接
-                using (MySqlConnection conn = new MySqlConnection(ConnectionString))
+                using (MySqlConnection conn = new MySqlConnection(connectstring))
                 {
                     // SQL语句使用参数化防止SQL注入
                     string sql = "SELECT UID, Password, UserName FROM userinfo WHERE UID = @account AND Password = @password";
@@ -108,5 +109,23 @@ namespace WeChattingClient
         private void LogIn_Load(object sender, EventArgs e)
         {
         }
+        private void LoadLoginFromXml()
+        {
+            try
+            {
+              
+                string uid = DbConfig.UID;
+                string pwd = DbConfig.Password;
+             
+
+                if (!string.IsNullOrEmpty(uid)) textInputAccount.Text = uid;
+                if (!string.IsNullOrEmpty(pwd)) textInputPassword.Text = pwd;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("读取登录信息失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
     }
 }

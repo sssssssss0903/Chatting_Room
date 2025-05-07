@@ -73,6 +73,16 @@ namespace WeChattingClient.Properties {
         /// <summary>
         ///   查找 System.Drawing.Bitmap 类型的本地化资源。
         /// </summary>
+        internal static System.Drawing.Bitmap default_avatar {
+            get {
+                object obj = ResourceManager.GetObject("default_avatar", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
         internal static System.Drawing.Bitmap denglu {
             get {
                 object obj = ResourceManager.GetObject("denglu", resourceCulture);
@@ -86,6 +96,16 @@ namespace WeChattingClient.Properties {
         internal static System.Drawing.Bitmap greenbkg {
             get {
                 object obj = ResourceManager.GetObject("greenbkg", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        internal static System.Drawing.Bitmap group_avatar {
+            get {
+                object obj = ResourceManager.GetObject("group_avatar", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

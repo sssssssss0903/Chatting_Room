@@ -7,6 +7,8 @@ using System.Threading;
 using System.Windows.Forms;
 using MySql.Data.MySqlClient;
 using System.Linq;
+using System.Text.RegularExpressions;
+using System.Xml;
 
 namespace WeChattingServer
 {
@@ -20,14 +22,44 @@ namespace WeChattingServer
         private List<TcpClient> clientList = new List<TcpClient>();
 
         private object locker = new object();
-        private string connStr = "server=localhost;user id=root;password=123456;database=wechatting;charset=utf8;";
+        // 声明为空，由 LoadServerConfig() 动态设置
+        private string connStr = "";
 
         public Form1()
         {
             InitializeComponent();
             this.FormClosing += Form1_FormClosing;
         }
+        private void LoadServerConfig()
+        {
+            try
+            {
+                XmlDocument doc = new XmlDocument();
+                doc.Load("server_config.xml");
 
+                // 读取端口
+                string portText = doc.SelectSingleNode("/ServerConfig/Port")?.InnerText;
+                if (int.TryParse(portText, out int configPort))
+                {
+                    serverPort = configPort;
+                }
+
+                // 读取数据库信息
+                string host = doc.SelectSingleNode("/ServerConfig/Database/Host")?.InnerText;
+                string user = doc.SelectSingleNode("/ServerConfig/Database/User")?.InnerText;
+                string password = doc.SelectSingleNode("/ServerConfig/Database/Password")?.InnerText;
+                string dbName = doc.SelectSingleNode("/ServerConfig/Database/Name")?.InnerText;
+                string charset = doc.SelectSingleNode("/ServerConfig/Database/Charset")?.InnerText ?? "utf8";
+
+                // 构建连接字符串
+                connStr = $"server={host};user id={user};password={password};database={dbName};charset={charset};";
+                listServerMessage.Items.Add("已加载配置文件 server_config.xml");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("读取配置文件失败：" + ex.Message);
+            }
+        }
         private void buttonListen_Click(object sender, EventArgs e)
         {
             if (!string.IsNullOrWhiteSpace(textServerPort.Text))
@@ -98,15 +130,34 @@ namespace WeChattingServer
                     Console.WriteLine("收到消息: " + msg);
 
                     // === 拆分消息 ===
-                    int firstIndex = msg.IndexOf("$");
-                    int lastIndex = msg.LastIndexOf("$");
-                    if (firstIndex == -1 || lastIndex == -1 || firstIndex == lastIndex)
-                        continue;
+                    // 引入命名分组的正则表达式
+                    Regex msgRegex = new Regex(@"^(?<receiver>[#\w]+)\$(?<message>.*?)\$(?<sender>\w+)$");
 
-                    string receiverUID = msg.Substring(0, firstIndex);
-                    string messageBody = msg.Substring(firstIndex + 1, lastIndex - firstIndex - 1);
-                    string senderUID = msg.Substring(lastIndex + 1);
 
+
+                    Match match = msgRegex.Match(msg);
+                    if (!match.Success)
+                    {
+                        Console.WriteLine("消息格式非法，忽略");
+                        return;
+                    }
+
+                    string receiverUID = match.Groups["receiver"].Value;
+                    string messageBody = match.Groups["message"].Value;
+                    string senderUID = match.Groups["sender"].Value;
+
+                    if (!ValidateUID(senderUID))
+                    {
+                        Console.WriteLine($"UID 格式不合法（{senderUID}），已拦截");
+                        return;
+                    }
+
+                    
+                    if (receiverUID != "000000" && receiverUID != "######" && !ValidateUID(receiverUID))
+                    {
+                        Console.WriteLine($"接收者 UID 非法（{receiverUID}），已拦截");
+                        return;
+                    }
                     // === 注册上线消息（不会转发） ===
                     if (receiverUID == "######")
                     {
@@ -286,6 +337,11 @@ namespace WeChattingServer
                 MessageBox.Show("更新在线用户失败：" + ex.Message);
             }
         }
+        private bool ValidateUID(string uid)
+        {
+            Regex uidRegex = new Regex(@"^\d{6}$");
+            return uidRegex.IsMatch(uid);
+        }
 
         private void listOnlineUsers_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -294,10 +350,15 @@ namespace WeChattingServer
 
         private void Form1_Load(object sender, EventArgs e)
         {
-
+            LoadServerConfig();
         }
 
         private void label2_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void label1_Click(object sender, EventArgs e)
         {
 
         }

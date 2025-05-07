@@ -6,7 +6,9 @@ namespace WeChattingClient
 {
     public partial class Register : Form
     {
-        private static readonly string ConnectionString = "server=127.0.0.1;user id=root;password=123456;database=wechatting;Charset=utf8;";
+
+        //请求连接数据库
+        private static string connectstring = DbConfig.GetConnectionString();
 
         public Register()
         {
@@ -30,7 +32,7 @@ namespace WeChattingClient
             string uid;
             bool exists = true;
 
-            using (MySqlConnection conn = new MySqlConnection(ConnectionString))
+            using (MySqlConnection conn = new MySqlConnection(connectstring))
             {
                 conn.Open();
                 while (exists)
@@ -78,7 +80,7 @@ namespace WeChattingClient
 
             try
             {
-                using (MySqlConnection conn = new MySqlConnection(ConnectionString))
+                using (MySqlConnection conn = new MySqlConnection(connectstring))
                 {
                     conn.Open();
 

@@ -14,6 +14,8 @@ namespace WeChattingClient
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            // 读取配置文件
+            DbConfig.LoadFromXml();
             LogIn login = new LogIn();
 
             Application.Run(login) ;

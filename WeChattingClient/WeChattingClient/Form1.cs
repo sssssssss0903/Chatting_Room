@@ -14,6 +14,8 @@ using MySql.Data.MySqlClient;
 using System.IO;
 using J3QQ4;
 using Google.Protobuf.WellKnownTypes;
+using System.Text.RegularExpressions;
+using System.Xml;
 
 namespace WeChattingClient
 {
@@ -30,10 +32,8 @@ namespace WeChattingClient
         //是否运行
         private bool isRunning;
 
-
         //请求连接数据库
-        private static string connectstring = "data source=localhost;database=wechatting;" +
-     "user id=root;password=123456;pooling=true;charset=utf8;";
+        private static string connectstring = DbConfig.GetConnectionString();
         //好友列表UID+姓名
         Dictionary<string, string> friend = new Dictionary<string, string>();
         Dictionary<string, string> friendChatInfo = new Dictionary<string, string>();
@@ -44,6 +44,7 @@ namespace WeChattingClient
         private Panel curPanel;
         //定时获得好友列表
         private System.Windows.Forms.Timer friendTimer;
+        private ImageList friendImageList = new ImageList();
         private void StartFriendListAutoRefresh()
         {
             friendTimer = new System.Windows.Forms.Timer();
@@ -51,6 +52,134 @@ namespace WeChattingClient
             friendTimer.Tick += (s, e) => RefreshFriendList();
             friendTimer.Start();
         }
+
+
+        public Form1()
+        {
+            InitializeComponent();
+          
+        }
+
+        private void Form1_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            throw new NotImplementedException();
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            label1.Text = Emoji.Open_Mouth;
+            label2.Text = Emoji.Hushed;
+            label3.Text = Emoji.Grimacing;
+            label4.Text = Emoji.Neutral_Face;
+            label5.Text = Emoji.Sunglasses;
+            label6.Text = Emoji.Angry;
+
+            // 去掉灰线 + 设置背景透明一致
+
+            listAdd.BorderStyle = BorderStyle.None;
+            listAdd.BackColor = this.BackColor;
+            listAdd.ForeColor = Color.Black;
+            listAdd.Font = new Font("微软雅黑", 10);
+
+        }
+        #region 带参构造函数
+        public Form1(string myaccount, string mypassword, string myname)
+        {
+            InitializeComponent();
+            this.FormClosing += Form1_FormClosing;
+
+            Myaccount = myaccount;
+            MyPassword = mypassword;
+            MyName = myname;
+            label7.Text = $"{MyName}";
+
+
+            client = new TcpClient();
+            client.Connect("127.0.0.1", 8888); // 连接服务器
+            stream = client.GetStream();
+
+            // 发送注册上线信息
+            string registerMessage = "######$$" + Myaccount;
+
+            byte[] body = Encoding.UTF8.GetBytes(registerMessage);
+            byte[] length = BitConverter.GetBytes(body.Length);
+
+            byte[] toSend = new byte[4 + body.Length];
+            Buffer.BlockCopy(length, 0, toSend, 0, 4);
+            Buffer.BlockCopy(body, 0, toSend, 4, body.Length);
+
+            stream.Write(toSend, 0, toSend.Length);
+
+            //轮询获得好友列表
+            StartFriendListAutoRefresh();
+
+
+            isRunning = true;
+            Thread receiveThread = new Thread(ReceiveMessages);
+            receiveThread.IsBackground = true;
+            receiveThread.Start();
+
+            // 禁止改变窗体大小
+            this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            this.MaximizeBox = false;
+
+
+
+
+            if (listFriend.Columns.Count == 0)
+                listFriend.Columns.Add("好友", listFriend.Width - 20);
+
+            friendImageList.ImageSize = new Size(64, 64); // 控制头像显示大小
+            friendImageList.ColorDepth = ColorDepth.Depth32Bit;
+            listFriend.SmallImageList = friendImageList;
+
+            listFriend.DrawColumnHeader += ListFriend_DrawColumnHeader;
+            listFriend.DrawSubItem += ListFriend_DrawSubItem;
+            listFriend.DrawItem += ListFriend_DrawItem;
+            SetListViewRowHeight(listFriend, 68); // 64 + padding
+
+            RefreshUserAvatar();
+        }
+        #endregion
+
+
+        #region 好友列表显示
+        private void ListFriend_DrawColumnHeader(object sender, DrawListViewColumnHeaderEventArgs e)
+        {
+            e.DrawBackground(); // 不显示表头内容
+        }
+
+        private void ListFriend_DrawSubItem(object sender, DrawListViewSubItemEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            Rectangle originalBounds = e.Bounds;
+            ListViewItem item = e.Item;
+
+            int avatarSize = 128;
+            int padding = 10;
+
+            // 强制行高
+            int rowHeight = avatarSize + 4;
+            Rectangle newBounds = new Rectangle(originalBounds.Left, originalBounds.Top, originalBounds.Width, rowHeight);
+
+            // 头像绘制区域
+            Rectangle imageRect = new Rectangle(newBounds.Left + padding, newBounds.Top + 2, avatarSize, avatarSize);
+
+            // 昵称区域
+            Rectangle textRect = new Rectangle(imageRect.Right + padding, newBounds.Top + (avatarSize - 20) / 2, newBounds.Width - avatarSize - 3 * padding, 20);
+
+            if (friendImageList.Images.ContainsKey(item.ImageKey))
+            {
+                Image avatar = friendImageList.Images[item.ImageKey];
+                g.DrawImage(avatar, imageRect);
+            }
+
+            using (Font font = new Font("微软雅黑", 10, FontStyle.Bold))
+            {
+                TextRenderer.DrawText(g, item.Text, font, textRect, Color.RoyalBlue, TextFormatFlags.Left);
+            }
+        }
+
 
         private void RefreshFriendList()
         {
@@ -80,33 +209,69 @@ namespace WeChattingClient
                 {
                     friend = newFriendDict;
 
+                    // 初始化 ListView 和 ImageList
+                    listFriend.View = View.LargeIcon;
+                    listFriend.LargeImageList = friendImageList;
+
+
+                    if (listFriend.Columns.Count == 0)
+                        listFriend.Columns.Add("", listFriend.Width - 5);  // 添加列用于显示头像+昵称
+
+                    friendImageList.Images.Clear();
                     listFriend.Items.Clear();
-                    foreach (string fname in friend.Values)
+
+                    foreach (var kvp in friend)
                     {
-                        ListViewItem item = new ListViewItem(fname);
+                        string uid = kvp.Key;
+                        string name = kvp.Value;
+
+                        Image avatar = GetUserAvatar(uid);
+                        string imageKey = uid;
+
+                        if (!friendImageList.Images.ContainsKey(imageKey))
+                        {
+                            Bitmap avatarResized = new Bitmap(avatar, new Size(128, 128));
+                            friendImageList.Images.Add(imageKey, avatarResized);
+
+                            // 带红点版本
+                            Image avatarWithDot = AddRedDotToAvatar(avatarResized);
+                            friendImageList.Images.Add(imageKey + "_notify", avatarWithDot);
+                        }
+
+                        ListViewItem item = new ListViewItem(name);
+                        item.ImageKey = imageKey;
                         listFriend.Items.Add(item);
                     }
                 }
 
-                // 无论好友是否更新，都确保“群聊”项存在
+                // 保证“群聊”项存在
                 bool hasGroup = listFriend.Items.Cast<ListViewItem>().Any(i => i.Text == "群聊");
                 if (!hasGroup)
                 {
-                    listFriend.Items.Add(new ListViewItem("群聊"));
+                    if (!friendImageList.Images.ContainsKey("group"))
+                    {
+                      
+                        friendImageList.Images.Add("group", new Bitmap(Properties.Resources.group_avatar, new Size(128, 128)));
+                    }
+
+                    ListViewItem groupItem = new ListViewItem("群聊");
+                    groupItem.ImageKey = "group";
+                    listFriend.Items.Add(groupItem);
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine("实时刷新好友列表失败：" + ex.Message);
             }
-            // 若当前未初始化聊天对象且好友列表不为空，则初始化聊天面板
+
+            // 若未初始化聊天对象
             if (string.IsNullOrEmpty(chatFriend) && listFriend.Items.Count > 0)
             {
                 string kvpSearch = listFriend.Items[0].Text;
 
                 if (kvpSearch == "群聊")
                 {
-                    chatFriend = "000000"; // 群聊特殊UID
+                    chatFriend = "000000";
                 }
                 else
                 {
@@ -120,59 +285,44 @@ namespace WeChattingClient
                     }
                 }
 
-                ShowChatBox(kvpSearch); // 初始化面板
+                ShowChatBox(kvpSearch);
             }
         }
-        public Form1()
+
+        private Image GetUserAvatar(string uid)
         {
-            InitializeComponent();
-            // 禁止改变窗体大小
-            this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
-         
-        }
-        #region 带参构造函数
-        public Form1(string myaccount, string mypassword, string myname)
-        {
-            InitializeComponent();
-            this.FormClosing += Form1_FormClosing;
+            try
+            {
+                using (MySqlConnection conn = new MySqlConnection(connectstring))
+                {
+                    conn.Open();
+                    string sql = "SELECT Avatar FROM userinfo WHERE UID = @uid";
+                    using (MySqlCommand cmd = new MySqlCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@uid", uid);
+                        object result = cmd.ExecuteScalar();
 
-            Myaccount = myaccount;
-            MyPassword = mypassword;
-            MyName = myname;
+                        if (result != null && result != DBNull.Value)
+                        {
+                            byte[] bytes = (byte[])result;
+                            using (MemoryStream ms = new MemoryStream(bytes))
+                            {
+                                return Image.FromStream(ms);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"读取用户 {uid} 的头像失败：" + ex.Message);
+            }
 
-
-            client = new TcpClient();
-            client.Connect("127.0.0.1", 8888); // 连接服务器
-            stream = client.GetStream();
-
-            // 发送注册上线信息
-            string registerMessage = "######" + "$你好$" + Myaccount;
-            byte[] body = Encoding.UTF8.GetBytes(registerMessage);
-            byte[] length = BitConverter.GetBytes(body.Length);
-
-            byte[] toSend = new byte[4 + body.Length];
-            Buffer.BlockCopy(length, 0, toSend, 0, 4);
-            Buffer.BlockCopy(body, 0, toSend, 4, body.Length);
-
-            stream.Write(toSend, 0, toSend.Length);
-
-            //轮询获得好友列表
-            StartFriendListAutoRefresh();
-
-
-            isRunning = true;
-            Thread receiveThread = new Thread(ReceiveMessages);
-            receiveThread.IsBackground = true;
-            receiveThread.Start();
+            return Properties.Resources.default_avatar; // 返回默认头像
         }
         #endregion
 
 
-        private void Form1_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            throw new NotImplementedException();
-        }
         #region 加载历史记录
         private void LoadHistoryMessages(string friendName)
         {
@@ -234,6 +384,7 @@ namespace WeChattingClient
 
 
         #endregion
+
         #region 接收信息线程
         private void ReceiveMessages()
         {
@@ -281,19 +432,19 @@ namespace WeChattingClient
 
                     string fullMessage = Encoding.UTF8.GetString(messageBytes);
                     Console.WriteLine($"[客户端] 收到消息：{fullMessage}");
+                    // ===第三步：拆解消息格式 ===
+                    string pattern = @"^(.*?)\$(.*?)\$(.*?)$";
+                    Match match = Regex.Match(fullMessage, pattern);
 
-                    // === 拆解 message$sender$receiver ===
-                    int first = fullMessage.IndexOf("$");
-                    int second = fullMessage.IndexOf("$", first + 1);
-                    if (first == -1 || second == -1)
+                    if (!match.Success)
                     {
-                        Console.WriteLine("[客户端] 消息格式错误，缺少$分隔符");
+                        Console.WriteLine("[客户端] 消息格式错误，未匹配正则");
                         continue;
                     }
 
-                    string message = fullMessage.Substring(0, first);
-                    string senderUID = fullMessage.Substring(first + 1, second - first - 1);
-                    string receiverUID = fullMessage.Substring(second + 1);
+                    string message = match.Groups[1].Value;
+                    string senderUID = match.Groups[2].Value;
+                    string receiverUID = match.Groups[3].Value;
 
                     if (receiverUID == "000000" && senderUID == Myaccount)
                         continue;
@@ -312,9 +463,38 @@ namespace WeChattingClient
                 }
             }
         }
-
-
         #endregion
+
+        #region 新消息提醒：用户头像上显示红点
+        private void ClearRedDotFromAvatar(string uid)
+        {
+            foreach (ListViewItem item in listFriend.Items)
+            {
+                if (item.ImageKey == uid + "_notify")
+                {
+                    item.ImageKey = uid;
+                    break;
+                }
+            }
+        }
+
+        private void ShowRedDotOnAvatar(string uid)
+        {
+            foreach (ListViewItem item in listFriend.Items)
+            {
+                if (item.ImageKey == uid)
+                {
+                    if (friendImageList.Images.ContainsKey(uid + "_notify"))
+                    {
+                        item.ImageKey = uid + "_notify";
+                    }
+                    break;
+                }
+            }
+        }
+        #endregion
+
+        #region 收取消息
         private void HandleReceivedMessage(string message, string senderUID, string receiverUID)
         {
             string displayName = (receiverUID == "000000")
@@ -325,14 +505,23 @@ namespace WeChattingClient
 
             this.Invoke(new Action(() =>
             {
-                // 创建面板
+                // 创建聊天框面板（如果不存在）
                 Control[] chatBoxes = panelChat.Controls.Find(displayName, false);
                 if (chatBoxes.Length == 0)
                 {
                     ShowChatBox(displayName);
                 }
 
-                // 文件消息处理
+                // === 是否为当前正在聊天对象，如果不是，头像加红点 ===
+                bool isGroup = receiverUID == "000000";
+                string senderKey = isGroup ? "群聊" : (senderUID == Myaccount ? receiverUID : senderUID);
+
+                if (chatFriend != senderKey) // senderKey 为 UID 或 "群聊"
+                {
+                    ShowRedDotOnAvatar(senderKey);
+                }
+
+                // === 文件消息处理 ===
                 if (message.StartsWith("FILE:"))
                 {
                     try
@@ -367,6 +556,8 @@ namespace WeChattingClient
             }));
         }
 
+
+     
         private void AddMessageToPanel(string friendName, string senderUID, string message, DateTime time)
         {
             Panel panelReceive = panelChat.Controls.Find(friendName, false).FirstOrDefault() as Panel;
@@ -459,16 +650,9 @@ namespace WeChattingClient
             return result;
         }
 
+        #endregion
 
 
-        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            isRunning = false;
-            stream?.Close();
-            client?.Close();
-            client?.Dispose();
-            Application.Exit();
-        }
         #region 发消息事件
         private void buttonSend_Click(object sender, EventArgs e)
         {
@@ -485,9 +669,15 @@ namespace WeChattingClient
 
                 // 构造消息格式：receiverUID$message$Myaccount
                 string sendMessage = receiverUID + "$" + message + "$" + Myaccount;
-
+                string filteredMessage = FilterMessageBody(sendMessage);
+                if (string.IsNullOrWhiteSpace(filteredMessage))
+                {
+                    Console.WriteLine("消息为空或被过滤为无效，已拦截");
+                    return;
+                }
                 // 转为 UTF8 字节
                 byte[] messageBody = Encoding.UTF8.GetBytes(sendMessage);
+             
 
                 // 构造前4字节长度头
                 byte[] lengthBytes = BitConverter.GetBytes(messageBody.Length);
@@ -542,7 +732,9 @@ namespace WeChattingClient
                 // 获取点击的好友名字
                 ListViewItem selectFriend = listFriend.SelectedItems[0];
                 string friendName = selectFriend.Text;
-
+                string uid = friendName == "群聊" ? "群聊" : friend.FirstOrDefault(x => x.Value == friendName).Key;
+                // 清除红点
+                ClearRedDotFromAvatar(uid);
                 // 根据名字修改chatFriend
                 if (friendName.Equals("群聊"))
                 {
@@ -563,6 +755,7 @@ namespace WeChattingClient
         }
 
         #endregion
+
         #region 切换对话框，在每次切换聊天好友时调用
         //显示与好友的对话框
         public void ShowChatBox(string friendName)
@@ -607,7 +800,7 @@ namespace WeChattingClient
 
         #endregion
 
-
+        #region 搜索用户添加好友
         private void buttonAdd_Click(object sender, EventArgs e)
         {
             this.buttonAddFriend.Visible = true;
@@ -769,49 +962,9 @@ namespace WeChattingClient
                 MessageBox.Show("添加好友失败：" + ex.Message);
             }
         }
+        #endregion
 
-
-
-        private void panelChat_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
-
-        private void textSend_TextChanged(object sender, EventArgs e)
-        {
-
-        }
-
-        private void pictureBox1_Click(object sender, EventArgs e)
-        {
-            this.WindowState = FormWindowState.Minimized;
-        }
-
-        private void quit_Click(object sender, EventArgs e)
-        {
-            Application.ExitThread();
-        }
-
-        private void textAdd_TextChanged(object sender, EventArgs e)
-        {
-
-        }
-        private void Form1_Load(object sender, EventArgs e)
-        {
-            label1.Text = Emoji.Open_Mouth;
-            label2.Text = Emoji.Hushed;
-            label3.Text = Emoji.Grimacing;
-            label4.Text = Emoji.Neutral_Face;
-            label5.Text = Emoji.Sunglasses;
-            label6.Text = Emoji.Angry;
-            // 去掉灰线 + 设置背景透明一致
-
-            listAdd.BorderStyle = BorderStyle.None;
-            listAdd.BackColor = this.BackColor; 
-            listAdd.ForeColor = Color.Black;
-            listAdd.Font = new Font("微软雅黑", 10);
-
-        }
+        #region 发送文件
         public void uploadFile()
         {
             OpenFileDialog dialog = new OpenFileDialog();
@@ -873,8 +1026,213 @@ namespace WeChattingClient
                 MessageBox.Show("发送失败：" + ex.Message);
             }
         }
+        #endregion
 
+        #region 过滤消息
+        private string FilterMessageBody(string messageBody)
+        {
+            // 清除 HTML
+            messageBody = Regex.Replace(messageBody, "<.*?>", string.Empty);
 
+            // 替换敏感词
+            string[] badWords = { "傻瓜", "废物", "蠢货" };
+            foreach (var word in badWords)
+            {
+                messageBody = Regex.Replace(messageBody, word, "**");
+            }
+
+            // 限制长度
+            if (messageBody.Length > 300)
+            {
+                messageBody = messageBody.Substring(0, 300) + " ...";
+            }
+
+            return messageBody.Trim();
+        }
+        #endregion
+
+        #region 保存配置
+        private void SaveClientConfig(string uid, string password)
+        {
+            try
+            {
+                XmlDocument doc = new XmlDocument();
+                XmlElement root = doc.CreateElement("ClientConfig");
+
+                XmlElement uidElem = doc.CreateElement("UID");
+                uidElem.InnerText = uid;
+
+                XmlElement pwdElem = doc.CreateElement("Password");
+                pwdElem.InnerText = password;
+
+                XmlElement dbElem = doc.CreateElement("Database");
+
+                XmlElement hostElem = doc.CreateElement("Host");
+                hostElem.InnerText = "localhost";
+
+                XmlElement portElem = doc.CreateElement("Port");
+                portElem.InnerText = "3306";
+
+                XmlElement nameElem = doc.CreateElement("Name");
+                nameElem.InnerText = "wechatting";
+
+                XmlElement userElem = doc.CreateElement("User");
+                userElem.InnerText = "root";
+
+                XmlElement dbPwdElem = doc.CreateElement("DbPassword");
+                dbPwdElem.InnerText = "123456";
+
+                dbElem.AppendChild(hostElem);
+                dbElem.AppendChild(portElem);
+                dbElem.AppendChild(nameElem);
+                dbElem.AppendChild(userElem);
+                dbElem.AppendChild(dbPwdElem);
+
+                root.AppendChild(uidElem);
+                root.AppendChild(pwdElem);
+                root.AppendChild(dbElem);
+
+                doc.AppendChild(root);
+                doc.Save("client_config.xml");
+
+                MessageBox.Show("配置已保存");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("保存失败：" + ex.Message);
+            }
+        }
+        #endregion
+
+        #region 加载头像
+        private void button4_Click(object sender, EventArgs e)
+        {
+            // 弹出文件选择框
+            OpenFileDialog dialog = new OpenFileDialog();
+            dialog.Title = "请选择头像图片";
+            dialog.Filter = "图片文件 (*.jpg;*.png;*.jpeg)|*.jpg;*.png;*.jpeg";
+
+            if (dialog.ShowDialog() == DialogResult.OK)
+            {
+                string selectedPath = dialog.FileName;
+
+                // 显示到 PictureBox（预览效果）
+                pictureBoxAvatar.Image = Image.FromFile(selectedPath);
+
+                // 上传保存到数据库
+                SaveAvatarToDatabase(Myaccount, selectedPath);  // Myaccount 是当前登录 UID
+            }
+        }
+        private void RefreshUserAvatar()
+        {
+            Image avatar = null;
+
+            try
+            {
+                using (MySqlConnection conn = new MySqlConnection(connectstring))
+                {
+                    conn.Open();
+                    string sql = "SELECT Avatar FROM userinfo WHERE UID = @uid";
+                    using (MySqlCommand cmd = new MySqlCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@uid", Myaccount);
+                        object result = cmd.ExecuteScalar();
+
+                        if (result != null && result != DBNull.Value)
+                        {
+                            byte[] bytes = (byte[])result;
+                            //  MessageBox.Show($"数据库中头像大小：{bytes.Length} 字节", "调试");
+
+                            using (MemoryStream ms = new MemoryStream(bytes))
+                            {
+                                avatar = Image.FromStream(ms);
+                            }
+                        }
+                        else
+                        {
+                            //MessageBox.Show("数据库中未找到头像", "调试");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("读取头像失败：" + ex.Message, "异常");
+            }
+
+            if (avatar == null)
+            {
+                try
+                {
+                    avatar = Properties.Resources.default_avatar;
+                    //MessageBox.Show("使用内置默认头像（Resources.resx）", "调试");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("加载默认头像异常：" + ex.Message, "异常");
+                }
+            }
+
+            pictureBoxAvatar.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBoxAvatar.Image = avatar;
+        }
+        private void ListFriend_DrawItem(object sender, DrawListViewItemEventArgs e)
+        {
+            // 不画背景，让 DrawSubItem 来画
+            e.DrawBackground();
+        }
+        private void SetListViewRowHeight(ListView lv, int height)
+        {
+            // 创建一个假的 ImageList 设置高度
+            ImageList imgList = new ImageList();
+            imgList.ImageSize = new Size(1, height);
+            lv.SmallImageList = imgList;
+        }
+        private Image AddRedDotToAvatar(Image original)
+        {
+            Bitmap bmp = new Bitmap(original);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                int dotSize = 16;
+                int padding = 4;
+
+                int x = bmp.Width - dotSize - padding;
+                int y = padding;
+
+                using (Brush redBrush = new SolidBrush(Color.Red))
+                {
+                    g.FillEllipse(redBrush, x, y, dotSize, dotSize);
+                }
+            }
+            return bmp;
+        }
+        private void SaveAvatarToDatabase(string uid, string imagePath)
+        {
+            try
+            {
+                byte[] avatarBytes = File.ReadAllBytes(imagePath);
+
+                using (MySqlConnection conn = new MySqlConnection(connectstring))
+                {
+                    conn.Open();
+                    string sql = "UPDATE userinfo SET Avatar = @avatar WHERE UID = @uid";
+
+                    using (MySqlCommand cmd = new MySqlCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@avatar", avatarBytes);
+                        cmd.Parameters.AddWithValue("@uid", uid);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                RefreshUserAvatar();
+                MessageBox.Show("头像上传成功！");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("头像上传失败：" + ex.Message);
+            }
+        }
+#endregion
 
         private void label1_Click_1(object sender, EventArgs e)
         {
@@ -919,6 +1277,62 @@ namespace WeChattingClient
         private void labelAdd_Click(object sender, EventArgs e)
         {
 
+        }
+
+        private void label7_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            SaveClientConfig(Myaccount,MyPassword);
+        }
+
+       
+
+        private void pictureBoxAvatar_Click(object sender, EventArgs e)
+        {
+
+        }
+        private void panelChat_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void textSend_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void pictureBox1_Click(object sender, EventArgs e)
+        {
+            this.WindowState = FormWindowState.Minimized;
+        }
+
+        private void quit_Click(object sender, EventArgs e)
+        {
+            Application.ExitThread();
+        }
+
+        private void textAdd_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            isRunning = false;
+            stream?.Close();
+            client?.Close();
+            client?.Dispose();
+            Application.Exit();
+        }
+
+        private void button5_Click(object sender, EventArgs e)
+        {
+            LogIn loginForm = new LogIn();
+            loginForm.Show();     // 显示登录窗口
+            this.Hide();
         }
     }
 }
