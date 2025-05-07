@@ -9,6 +9,8 @@ using MySql.Data.MySqlClient;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml;
+using System.Threading.Tasks;
+
 
 namespace WeChattingServer
 {
@@ -71,23 +73,23 @@ namespace WeChattingServer
             server.Start();
             listServerMessage.Items.Add($"TCP服务器启动成功，监听端口：{serverPort}");
 
-            listenThread = new Thread(ListenForClients);
-            listenThread.IsBackground = true;
-            listenThread.Start();
+            ListenForClientsAsync();
         }
 
-        private void ListenForClients()
+
+        private async void ListenForClientsAsync()
+
         {
             while (true)
             {
                 try
                 {
-                    TcpClient client = server.AcceptTcpClient();
-                    clientList.Add(client);
-
-                    Thread clientThread = new Thread(() => HandleClientComm(client));
-                    clientThread.IsBackground = true;
-                    clientThread.Start();
+                    TcpClient client = await server.AcceptTcpClientAsync();
+                    lock (locker)
+                    {
+                        clientList.Add(client);
+                    }
+                    _ = HandleClientCommAsync(client); // 启动客户端处理任务，不阻塞主循环
                 }
                 catch (Exception ex)
                 {
@@ -96,99 +98,67 @@ namespace WeChattingServer
                 }
             }
         }
-
-        private void HandleClientComm(TcpClient client)
+        private async Task HandleClientCommAsync(TcpClient client)
         {
             NetworkStream stream = client.GetStream();
-            byte[] buffer = new byte[4096];
 
             try
             {
                 while (true)
                 {
-                    // === 第一步：读取前4个字节作为长度头 ===
                     byte[] lengthBuffer = new byte[4];
-                    int lengthRead = stream.Read(lengthBuffer, 0, 4);
-                    if (lengthRead != 4) break; // 客户端断开
+                    int lengthRead = await stream.ReadAsync(lengthBuffer, 0, 4);
+                    if (lengthRead != 4) break;
 
                     int messageLength = BitConverter.ToInt32(lengthBuffer, 0);
-                    if (messageLength <= 0 || messageLength > 10_000_000) break; // 防止恶意数据（最多10MB）
+                    if (messageLength <= 0 || messageLength > 10_000_000) break;
 
-                    // === 第二步：按长度读取消息体 ===
                     byte[] messageBuffer = new byte[messageLength];
                     int totalRead = 0;
                     while (totalRead < messageLength)
                     {
-                        int read = stream.Read(messageBuffer, totalRead, messageLength - totalRead);
-                        if (read == 0) break; // 客户端断开
+                        int read = await stream.ReadAsync(messageBuffer, totalRead, messageLength - totalRead);
+                        if (read == 0) break;
                         totalRead += read;
                     }
-
-                    if (totalRead != messageLength) break; // 异常中断
+                    if (totalRead != messageLength) break;
 
                     string msg = Encoding.UTF8.GetString(messageBuffer);
                     Console.WriteLine("收到消息: " + msg);
 
-                    // === 拆分消息 ===
-                    // 引入命名分组的正则表达式
-                    Regex msgRegex = new Regex(@"^(?<receiver>[#\w]+)\$(?<message>.*?)\$(?<sender>\w+)$");
-
-
-
-                    Match match = msgRegex.Match(msg);
-                    if (!match.Success)
-                    {
-                        Console.WriteLine("消息格式非法，忽略");
-                        return;
-                    }
+                    Match match = Regex.Match(msg, @"^(?<receiver>[#\w]+)\$(?<message>.*?)\$(?<sender>\w+)$");
+                    if (!match.Success) return;
 
                     string receiverUID = match.Groups["receiver"].Value;
                     string messageBody = match.Groups["message"].Value;
                     string senderUID = match.Groups["sender"].Value;
 
-                    if (!ValidateUID(senderUID))
-                    {
-                        Console.WriteLine($"UID 格式不合法（{senderUID}），已拦截");
-                        return;
-                    }
+                    if (!ValidateUID(senderUID) ||
+                        (receiverUID != "000000" && receiverUID != "######" && !ValidateUID(receiverUID))) return;
 
-                    
-                    if (receiverUID != "000000" && receiverUID != "######" && !ValidateUID(receiverUID))
-                    {
-                        Console.WriteLine($"接收者 UID 非法（{receiverUID}），已拦截");
-                        return;
-                    }
-                    // === 注册上线消息（不会转发） ===
                     if (receiverUID == "######")
                     {
                         bool isNew;
-
                         lock (locker)
                         {
                             isNew = !uidToClient.ContainsKey(senderUID);
                             uidToClient[senderUID] = client;
-                            if (!clientList.Contains(client))
-                                clientList.Add(client);
+                            if (!clientList.Contains(client)) clientList.Add(client);
                         }
-
-                        // 这里已经脱离 lock 范围，可以放心调用 Invoke
                         this.Invoke(new Action(() =>
                         {
                             if (isNew)
                                 listServerMessage.Items.Add($"新用户上线: {senderUID}");
-
-                            UpdateOnlineUsers(); 
+                            UpdateOnlineUsers();
                         }));
                         continue;
                     }
 
-                    // === 服务端显示 ===
                     this.Invoke(new Action(() =>
                     {
                         listServerMessage.Items.Add($"[来自 {senderUID} 发给 {receiverUID}]：{messageBody}");
                     }));
 
-                    // === 构造转发消息（带长度头） ===
                     string forwardMsg = messageBody + "$" + senderUID + "$" + receiverUID;
                     byte[] forwardBytes = Encoding.UTF8.GetBytes(forwardMsg);
                     byte[] forwardLength = BitConverter.GetBytes(forwardBytes.Length);
@@ -196,7 +166,6 @@ namespace WeChattingServer
                     Buffer.BlockCopy(forwardLength, 0, toSend, 0, 4);
                     Buffer.BlockCopy(forwardBytes, 0, toSend, 4, forwardBytes.Length);
 
-                    // === 群聊/私聊 转发 ===
                     if (receiverUID == "000000")
                     {
                         lock (locker)
@@ -205,14 +174,7 @@ namespace WeChattingServer
                             {
                                 if (other.Connected)
                                 {
-                                    try
-                                    {
-                                        other.GetStream().Write(toSend, 0, toSend.Length);
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Console.WriteLine("群聊发送失败: " + ex.Message);
-                                    }
+                                    try { other.GetStream().Write(toSend, 0, toSend.Length); } catch { }
                                 }
                             }
                         }
@@ -223,14 +185,7 @@ namespace WeChattingServer
                         {
                             if (uidToClient.TryGetValue(receiverUID, out TcpClient targetClient) && targetClient.Connected)
                             {
-                                try
-                                {
-                                    targetClient.GetStream().Write(toSend, 0, toSend.Length);
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine("私聊发送失败: " + ex.Message);
-                                }
+                                try { targetClient.GetStream().Write(toSend, 0, toSend.Length); } catch { }
                             }
                             else
                             {
@@ -241,21 +196,21 @@ namespace WeChattingServer
                             }
                         }
                     }
-                    // === 存入数据库 ===
+
                     try
                     {
                         using (MySqlConnection conn = new MySqlConnection(connStr))
                         {
-                            conn.Open();
-                            string sql = "INSERT INTO chatinfo (sender, receiver, message, send_time) VALUES (@sender, @receiver, @message, NOW())";
-                            using (MySqlCommand cmd = new MySqlCommand(sql, conn))
+                            await conn.OpenAsync();
+                            using (MySqlCommand cmd = new MySqlCommand("INSERT INTO chatinfo (sender, receiver, message, send_time) VALUES (@sender, @receiver, @message, NOW())", conn))
                             {
                                 cmd.Parameters.AddWithValue("@sender", senderUID);
                                 cmd.Parameters.AddWithValue("@receiver", receiverUID);
                                 cmd.Parameters.AddWithValue("@message", messageBody);
-                                cmd.ExecuteNonQuery();
+                                await cmd.ExecuteNonQueryAsync();
                             }
                         }
+
                     }
                     catch (Exception ex)
                     {
@@ -271,27 +226,15 @@ namespace WeChattingServer
             {
                 client.Close();
                 string removeUID = null;
-
                 lock (locker)
                 {
                     clientList.Remove(client);
-
                     foreach (var kvp in uidToClient)
                     {
-                        if (kvp.Value == client)
-                        {
-                            removeUID = kvp.Key;
-                            break;
-                        }
+                        if (kvp.Value == client) { removeUID = kvp.Key; break; }
                     }
-
-                    if (removeUID != null)
-                    {
-                        uidToClient.Remove(removeUID);
-                    }
+                    if (removeUID != null) uidToClient.Remove(removeUID);
                 }
-
-                // 在 lock 外调用 UI 更新，避免死锁
                 if (removeUID != null)
                 {
                     this.Invoke(new Action(() =>
@@ -300,10 +243,11 @@ namespace WeChattingServer
                         UpdateOnlineUsers();
                     }));
                 }
-
             }
+
         }
 
+     
 
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
@@ -362,5 +306,6 @@ namespace WeChattingServer
         {
 
         }
+
     }
 }
