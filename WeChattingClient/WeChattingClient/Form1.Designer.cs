@@ -421,8 +421,8 @@ namespace WeChattingClient
 
         private System.Windows.Forms.TextBox textSend;
         private System.Windows.Forms.Button buttonSend;
-    
-   
+
+
         private System.Windows.Forms.ListView listFriend;
         private System.Windows.Forms.ColumnHeader columnHeader1;
         private System.Windows.Forms.Panel panelChat;
@@ -449,4 +449,3 @@ namespace WeChattingClient
         private System.Windows.Forms.Button button5;
     }
 }
-

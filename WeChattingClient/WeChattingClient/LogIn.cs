@@ -1,5 +1,7 @@
 ﻿using System;
 using System.IO;
+using System.Net.Sockets;
+using System.Text;
 using System.Windows.Forms;
 using System.Xml;
 using MySql.Data.MySqlClient;
@@ -9,23 +11,31 @@ namespace WeChattingClient
     public partial class LogIn : Form
     {
         private static string connectstring = DbConfig.GetConnectionString();
-
+        private static System.Net.Sockets.TcpClient client;
+        private static NetworkStream stream;
         public LogIn()
         {   
             InitializeComponent();
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             LoadLoginFromXml();
+            // 初始化 TCP 连接
+            try
+            {
+                client = new TcpClient("127.0.0.1", 8888);
+                stream = client.GetStream();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("无法连接服务器：" + ex.Message);
+            }
         }
 
-        // 登录按钮点击事件
         private void buttonLogIn_Click(object sender, EventArgs e)
         {
-            // 获取用户输入
             string account = textInputAccount.Text.Trim();
             string password = textInputPassword.Text.Trim();
 
-            // 空值判断
             if (string.IsNullOrEmpty(account) || string.IsNullOrEmpty(password))
             {
                 MessageBox.Show("用户名或密码不能为空", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -34,46 +44,100 @@ namespace WeChattingClient
 
             try
             {
-                // 建立数据库连接
-                using (MySqlConnection conn = new MySqlConnection(connectstring))
+                // 1. 建立连接（如未连接）
+                if (client == null || !client.Connected)
                 {
-                    // SQL语句使用参数化防止SQL注入
-                    string sql = "SELECT UID, Password, UserName FROM userinfo WHERE UID = @account AND Password = @password";
+                    string serverIP = "127.0.0.1"; 
+                    int serverPort = 8888;
+                    client = new TcpClient();
+                    client.Connect(serverIP, serverPort);
+                    stream = client.GetStream();
+                }
 
-                    using (MySqlCommand cmd = new MySqlCommand(sql, conn))
+                // 2. 构造登录请求
+                string loginMsg = $"LOGIN${account}${password}";
+                byte[] body = Encoding.UTF8.GetBytes(loginMsg);
+                byte[] length = BitConverter.GetBytes(body.Length);
+                byte[] message = new byte[4 + body.Length];
+                Buffer.BlockCopy(length, 0, message, 0, 4);
+                Buffer.BlockCopy(body, 0, message, 4, body.Length);
+
+                stream.Write(message, 0, message.Length);
+
+                // 3. 等待响应（先读4字节长度）
+                byte[] lenBuf = new byte[4];
+                int lenRead = stream.Read(lenBuf, 0, 4);
+                if (lenRead != 4)
+                {
+                    MessageBox.Show("未能读取完整响应长度", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                int respLen = BitConverter.ToInt32(lenBuf, 0);
+                if (respLen <= 0 || respLen > 10000)
+                {
+                    MessageBox.Show("响应长度非法", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                byte[] respBody = new byte[respLen];
+                int totalRead = 0;
+                while (totalRead < respLen)
+                {
+                    int r = stream.Read(respBody, totalRead, respLen - totalRead);
+                    if (r == 0)
                     {
-                        cmd.Parameters.AddWithValue("@account", account);
-                        cmd.Parameters.AddWithValue("@password", password);
-
-                        conn.Open(); // 打开连接
-
-                        using (MySqlDataReader reader = cmd.ExecuteReader())
-                        {
-                            // 如果找到用户记录
-                            if (reader.Read())
-                            {
-                                string name = reader.GetString("UserName");
-
-                                // 登录成功，跳转主界面
-                                Form1 userForm = new Form1(account, password, name);
-
-                                userForm.Show();
-                                this.Hide(); // 隐藏登录窗口
-                                return;
-                            }
-                        }
+                        MessageBox.Show("连接中断", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
                     }
+                    totalRead += r;
+                }
 
-                    // 如果 reader.Read() 没有命中账号密码，则登录失败
+                string response = Encoding.UTF8.GetString(respBody);
+
+                // 4. 处理响应
+                if (response.StartsWith("LOGIN_OK$"))
+                {
+                    string[] parts = response.Split('$');
+                    if (parts.Length >= 2)
+                    {
+                        string userName = parts[1];
+
+                        // 登录成功后发送上线标识
+                        string onlineMsg = $"######$你好${account}";
+                        byte[] onlineBody = Encoding.UTF8.GetBytes(onlineMsg);
+                        byte[] onlineLen = BitConverter.GetBytes(onlineBody.Length);
+                        byte[] onlinePacket = new byte[4 + onlineBody.Length];
+                        Buffer.BlockCopy(onlineLen, 0, onlinePacket, 0, 4);
+                        Buffer.BlockCopy(onlineBody, 0, onlinePacket, 4, onlineBody.Length);
+                        stream.Write(onlinePacket, 0, onlinePacket.Length);
+
+                        // 跳转主窗口
+                        Form1 userForm = new Form1(account, password, userName, client, stream);
+                        userForm.Show();
+                        this.Hide();
+                    }
+                    else
+                    {
+                        MessageBox.Show("登录响应格式错误", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+                else if (response.StartsWith("LOGIN_FAIL"))
+                {
                     MessageBox.Show("账号或密码错误", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else
+                {
+                    MessageBox.Show("未知响应：" + response, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
             catch (Exception ex)
             {
-                // 捕获数据库连接或执行过程中的异常
                 MessageBox.Show("登录失败：" + ex.Message, "异常", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+
 
         // 注册按钮点击事件：跳转注册页面
         private void buttonRegister_Click(object sender, EventArgs e)

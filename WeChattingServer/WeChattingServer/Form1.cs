@@ -125,6 +125,108 @@ namespace WeChattingServer
 
                     string msg = Encoding.UTF8.GetString(messageBuffer);
                     Console.WriteLine("收到消息: " + msg);
+                    if (msg.StartsWith("REGISTER$"))
+                    {
+                        string[] parts = msg.Split('$');
+                        if (parts.Length == 4)
+                        {
+                            string uid = parts[1];
+                            string pwd = parts[2];
+                            string name = parts[3];
+
+                            try
+                            {
+                                using (MySqlConnection conn = new MySqlConnection(connStr))
+                                {
+                                    await conn.OpenAsync();
+
+                                    // 检查 UID 是否存在
+                                    string checkSql = "SELECT COUNT(*) FROM userinfo WHERE UID = @uid";
+                                    using (var checkCmd = new MySqlCommand(checkSql, conn))
+                                    {
+                                        checkCmd.Parameters.AddWithValue("@uid", uid);
+                                        int count = Convert.ToInt32(await checkCmd.ExecuteScalarAsync());
+
+                                        if (count > 0)
+                                        {
+                                            await SendMessageAsync(stream, "REGISTER_FAIL$账号已存在");
+                                            return;
+                                        }
+                                    }
+
+                                    // 插入新用户
+                                    string insertSql = "INSERT INTO userinfo (UID, Password, UserName) VALUES (@uid, @pwd, @name)";
+                                    using (var insertCmd = new MySqlCommand(insertSql, conn))
+                                    {
+                                        insertCmd.Parameters.AddWithValue("@uid", uid);
+                                        insertCmd.Parameters.AddWithValue("@pwd", pwd);
+                                        insertCmd.Parameters.AddWithValue("@name", name);
+                                        await insertCmd.ExecuteNonQueryAsync();
+                                    }
+
+                                    await SendMessageAsync(stream, "REGISTER_OK");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                await SendMessageAsync(stream, "REGISTER_FAIL$" + ex.Message);
+                            }
+
+                            continue;
+                        }
+                        else
+                        {
+                            await SendMessageAsync(stream, "REGISTER_FAIL$格式错误");
+                            continue;
+                        }
+                    }
+                    // ==== 登录请求处理 ====
+                    if (msg.StartsWith("LOGIN$"))
+                    {
+                        listServerMessage.Items.Add("收到登录请求：" + msg);
+                        string[] parts = msg.Split('$');
+                        if (parts.Length == 3)
+                        {
+                            string uid = parts[1];
+                            string pwd = parts[2];
+
+                            try
+                            {
+                                using (MySqlConnection conn = new MySqlConnection(connStr))
+                                {
+                                    await conn.OpenAsync();
+                                    string sql = "SELECT UserName FROM userinfo WHERE UID = @uid AND Password = @pwd";
+                                    using (MySqlCommand cmd = new MySqlCommand(sql, conn))
+                                    {
+                                        cmd.Parameters.AddWithValue("@uid", uid);
+                                        cmd.Parameters.AddWithValue("@pwd", pwd);
+
+                                        using (var reader = await cmd.ExecuteReaderAsync())
+                                        {
+                                            if (await reader.ReadAsync())
+                                            {
+                                                string userName = reader.GetString(reader.GetOrdinal("UserName"));
+                                                string successMsg = $"LOGIN_OK${userName}";
+                                                await SendMessageAsync(stream, successMsg);
+                                            }
+
+                                            else
+                                            {
+                                                await SendMessageAsync(stream, "LOGIN_FAIL");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine("登录处理失败：" + ex.Message);
+                                await SendMessageAsync(stream, "LOGIN_FAIL");
+                            }
+
+                            continue; // 继续等待下一个消息
+                        }
+                    }
 
                     Match match = Regex.Match(msg, @"^(?<receiver>[#\w]+)\$(?<message>.*?)\$(?<sender>\w+)$");
                     if (!match.Success) return;
@@ -247,7 +349,15 @@ namespace WeChattingServer
 
         }
 
-     
+        private async Task SendMessageAsync(NetworkStream stream, string message)
+        {
+            byte[] body = Encoding.UTF8.GetBytes(message);
+            byte[] length = BitConverter.GetBytes(body.Length);
+            byte[] toSend = new byte[4 + body.Length];
+            Buffer.BlockCopy(length, 0, toSend, 0, 4);
+            Buffer.BlockCopy(body, 0, toSend, 4, body.Length);
+            await stream.WriteAsync(toSend, 0, toSend.Length);
+        }
 
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)

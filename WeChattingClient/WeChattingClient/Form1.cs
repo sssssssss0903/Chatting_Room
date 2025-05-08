@@ -45,6 +45,8 @@ namespace WeChattingClient
         //定时获得好友列表
         private System.Windows.Forms.Timer friendTimer;
         private ImageList friendImageList = new ImageList();
+        // 标记哪些好友当前有新消息未读（显示红点）
+        private HashSet<string> uidWithRedDot = new HashSet<string>();
         private void StartFriendListAutoRefresh()
         {
             friendTimer = new System.Windows.Forms.Timer();
@@ -67,36 +69,28 @@ namespace WeChattingClient
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            label1.Text = Emoji.Open_Mouth;
-            label2.Text = Emoji.Hushed;
-            label3.Text = Emoji.Grimacing;
-            label4.Text = Emoji.Neutral_Face;
-            label5.Text = Emoji.Sunglasses;
-            label6.Text = Emoji.Angry;
+            typeof(ListView).InvokeMember("DoubleBuffered",
+              System.Reflection.BindingFlags.SetProperty |
+              System.Reflection.BindingFlags.Instance |
+              System.Reflection.BindingFlags.NonPublic,
+              null, listFriend, new object[] { true });
 
-            // 去掉灰线 + 设置背景透明一致
-
-            listAdd.BorderStyle = BorderStyle.None;
-            listAdd.BackColor = this.BackColor;
-            listAdd.ForeColor = Color.Black;
-            listAdd.Font = new Font("微软雅黑", 10);
 
         }
         #region 带参构造函数
-        public Form1(string myaccount, string mypassword, string myname)
+        public Form1(string myaccount, string mypassword, string myname, TcpClient myclient, NetworkStream mystream)
         {
             InitializeComponent();
+            
+            client = myclient;
+          stream = mystream;
+
             this.FormClosing += Form1_FormClosing;
 
             Myaccount = myaccount;
             MyPassword = mypassword;
             MyName = myname;
-            label7.Text = $"{MyName}";
-
-
-            client = new TcpClient();
-            client.Connect("127.0.0.1", 8888); // 连接服务器
-            stream = client.GetStream();
+            label7.Text = myname;
 
             // 发送注册上线信息
             string registerMessage = "######$$" + Myaccount;
@@ -139,6 +133,12 @@ namespace WeChattingClient
             SetListViewRowHeight(listFriend, 68); // 64 + padding
 
             RefreshUserAvatar();
+            label1.Text = Emoji.Open_Mouth;
+            label2.Text = Emoji.Hushed;
+            label3.Text = Emoji.Grimacing;
+            label4.Text = Emoji.Neutral_Face;
+            label5.Text = Emoji.Sunglasses;
+            label6.Text = Emoji.Angry;
         }
         #endregion
 
@@ -185,9 +185,10 @@ namespace WeChattingClient
         {
             try
             {
+                // 1. 读取最新好友列表
                 Dictionary<string, string> newFriendDict = new Dictionary<string, string>();
-
                 string sqlFriend = "SELECT FriendUID, UIDName FROM friend WHERE Myaccount = @uid";
+
                 using (MySqlConnection mscFriend = new MySqlConnection(connectstring))
                 {
                     MySqlCommand cmdFriend = new MySqlCommand(sqlFriend, mscFriend);
@@ -204,89 +205,74 @@ namespace WeChattingClient
                     }
                 }
 
-                bool friendChanged = !newFriendDict.OrderBy(k => k.Key).SequenceEqual(friend.OrderBy(k => k.Key));
-                if (friendChanged)
+                // 2. 更新当前缓存
+                friend = newFriendDict;
+
+                // 3. 清空并重建头像列表
+                listFriend.View = View.LargeIcon;
+                listFriend.LargeImageList = friendImageList;
+
+                if (listFriend.Columns.Count == 0)
+                    listFriend.Columns.Add("", listFriend.Width - 5);
+
+                friendImageList.Images.Clear();
+                listFriend.Items.Clear();
+
+                // 4. 添加所有好友项
+                foreach (var kvp in friend)
                 {
-                    friend = newFriendDict;
+                    string uid = kvp.Key;
+                    string name = kvp.Value;
 
-                    // 初始化 ListView 和 ImageList
-                    listFriend.View = View.LargeIcon;
-                    listFriend.LargeImageList = friendImageList;
+                    Image avatar = GetUserAvatar(uid);
+                    string imageKey = uid;
 
-
-                    if (listFriend.Columns.Count == 0)
-                        listFriend.Columns.Add("", listFriend.Width - 5);  // 添加列用于显示头像+昵称
-
-                    friendImageList.Images.Clear();
-                    listFriend.Items.Clear();
-
-                    foreach (var kvp in friend)
+                    if (!friendImageList.Images.ContainsKey(imageKey))
                     {
-                        string uid = kvp.Key;
-                        string name = kvp.Value;
+                        Bitmap avatarResized = new Bitmap(avatar, new Size(128, 128));
+                        friendImageList.Images.Add(imageKey, avatarResized);
 
-                        Image avatar = GetUserAvatar(uid);
-                        string imageKey = uid;
+                        // 添加带红点版本
+                        Image avatarWithDot = AddRedDotToAvatar(avatarResized);
+                        friendImageList.Images.Add(imageKey + "_notify", avatarWithDot);
+                    }
 
-                        if (!friendImageList.Images.ContainsKey(imageKey))
-                        {
-                            Bitmap avatarResized = new Bitmap(avatar, new Size(128, 128));
-                            friendImageList.Images.Add(imageKey, avatarResized);
+                    ListViewItem item = new ListViewItem(name);
+                    item.Tag = uid; // 保存真实UID
+                    item.ImageKey = uidWithRedDot.Contains(uid) ? imageKey + "_notify" : imageKey;
+                    listFriend.Items.Add(item);
+                }
 
-                            // 带红点版本
-                            Image avatarWithDot = AddRedDotToAvatar(avatarResized);
-                            friendImageList.Images.Add(imageKey + "_notify", avatarWithDot);
-                        }
-
-                        ListViewItem item = new ListViewItem(name);
-                        item.ImageKey = imageKey;
-                        listFriend.Items.Add(item);
+                // 5. 添加群聊项
+                if (!friendImageList.Images.ContainsKey("group"))
+                {
+                    try
+                    {
+                        Image groupAvatar = new Bitmap(Properties.Resources.group_avatar, new Size(128, 128));
+                        friendImageList.Images.Add("group", groupAvatar);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("加载群聊头像失败：" + ex.Message);
+                        friendImageList.Images.Add("group", Properties.Resources.default_avatar); // fallback
                     }
                 }
 
-                // 保证“群聊”项存在
-                bool hasGroup = listFriend.Items.Cast<ListViewItem>().Any(i => i.Text == "群聊");
-                if (!hasGroup)
-                {
-                    if (!friendImageList.Images.ContainsKey("group"))
-                    {
-                      
-                        friendImageList.Images.Add("group", new Bitmap(Properties.Resources.group_avatar, new Size(128, 128)));
-                    }
-
-                    ListViewItem groupItem = new ListViewItem("群聊");
-                    groupItem.ImageKey = "group";
-                    listFriend.Items.Add(groupItem);
-                }
+                ListViewItem groupItem = new ListViewItem("群聊");
+                groupItem.ImageKey = "group";
+                listFriend.Items.Add(groupItem);
             }
             catch (Exception ex)
             {
-                Console.WriteLine("实时刷新好友列表失败：" + ex.Message);
+                Console.WriteLine("刷新好友列表失败：" + ex.Message);
             }
 
-            // 若未初始化聊天对象
-            if (string.IsNullOrEmpty(chatFriend) && listFriend.Items.Count > 0)
+            if (string.IsNullOrEmpty(chatFriend))
             {
-                string kvpSearch = listFriend.Items[0].Text;
-
-                if (kvpSearch == "群聊")
-                {
-                    chatFriend = "000000";
-                }
-                else
-                {
-                    foreach (KeyValuePair<string, string> kvp in friend)
-                    {
-                        if (kvp.Value.Equals(kvpSearch))
-                        {
-                            chatFriend = kvp.Key;
-                            break;
-                        }
-                    }
-                }
-
-                ShowChatBox(kvpSearch);
+                chatFriend = "000000"; // 默认进入群聊
+                ShowChatBox("群聊");
             }
+
         }
 
         private Image GetUserAvatar(string uid)
@@ -466,11 +452,28 @@ namespace WeChattingClient
         #endregion
 
         #region 新消息提醒：用户头像上显示红点
-        private void ClearRedDotFromAvatar(string uid)
+        private void ShowRedDotOnAvatar(string uid)
         {
+            uidWithRedDot.Add(uid); // 记录红点状态
+
             foreach (ListViewItem item in listFriend.Items)
             {
-                if (item.ImageKey == uid + "_notify")
+                if ((string)item.Tag == uid)
+                {
+                    if (friendImageList.Images.ContainsKey(uid + "_notify"))
+                        item.ImageKey = uid + "_notify";
+                    break;
+                }
+            }
+        }
+
+        private void ClearRedDotFromAvatar(string uid)
+        {
+            uidWithRedDot.Remove(uid); // 移除红点状态
+
+            foreach (ListViewItem item in listFriend.Items)
+            {
+                if ((string)item.Tag == uid)
                 {
                     item.ImageKey = uid;
                     break;
@@ -478,20 +481,7 @@ namespace WeChattingClient
             }
         }
 
-        private void ShowRedDotOnAvatar(string uid)
-        {
-            foreach (ListViewItem item in listFriend.Items)
-            {
-                if (item.ImageKey == uid)
-                {
-                    if (friendImageList.Images.ContainsKey(uid + "_notify"))
-                    {
-                        item.ImageKey = uid + "_notify";
-                    }
-                    break;
-                }
-            }
-        }
+
         #endregion
 
         #region 收取消息
@@ -514,12 +504,14 @@ namespace WeChattingClient
 
                 // === 是否为当前正在聊天对象，如果不是，头像加红点 ===
                 bool isGroup = receiverUID == "000000";
-                string senderKey = isGroup ? "群聊" : (senderUID == Myaccount ? receiverUID : senderUID);
+                // 修复为只使用 UID
+                string senderUIDForRedDot = isGroup ? "000000" : (senderUID == Myaccount ? receiverUID : senderUID);
 
-                if (chatFriend != senderKey) // senderKey 为 UID 或 "群聊"
+                if (chatFriend != senderUIDForRedDot)
                 {
-                    ShowRedDotOnAvatar(senderKey);
+                    ShowRedDotOnAvatar(senderUIDForRedDot);
                 }
+
 
                 // === 文件消息处理 ===
                 if (message.StartsWith("FILE:"))
@@ -1094,7 +1086,9 @@ namespace WeChattingClient
 
                 doc.AppendChild(root);
                 doc.Save("client_config.xml");
-
+                // 更新内存中的值
+                DbConfig.UID = uid;
+                DbConfig.Password = password;
                 MessageBox.Show("配置已保存");
             }
             catch (Exception ex)
