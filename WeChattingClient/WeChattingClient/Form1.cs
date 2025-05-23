@@ -1014,6 +1014,8 @@ namespace WeChattingClient
                 }
             }
             catch (Exception ex)
+
+
             {
                 MessageBox.Show("发送失败：" + ex.Message);
             }

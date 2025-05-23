@@ -26,12 +26,71 @@ namespace WeChattingServer
         private object locker = new object();
         // 声明为空，由 LoadServerConfig() 动态设置
         private string connStr = "";
-
+        private CancellationTokenSource cts;
         public Form1()
         {
             InitializeComponent();
             this.FormClosing += Form1_FormClosing;
         }
+        private void EnsureDatabaseAndTablesExist(string host, string user, string password, string dbName, string charset)
+        {
+            try
+            {
+                // 第一步：连接到服务器，不指定 database
+                string noDbConnStr = $"server={host};user id={user};password={password};charset={charset};";
+                using (var conn = new MySqlConnection(noDbConnStr))
+                {
+                    conn.Open();
+                    using (var cmd = new MySqlCommand($"CREATE DATABASE IF NOT EXISTS `{dbName}` DEFAULT CHARSET {charset};", conn))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+
+                // 第二步：连接到目标数据库，创建表结构
+                string dbConnStr = $"server={host};user id={user};password={password};database={dbName};charset={charset};";
+                using (var conn = new MySqlConnection(dbConnStr))
+                {
+                    conn.Open();
+
+                    string userTable = @"
+    CREATE TABLE IF NOT EXISTS userinfo (
+        UID VARCHAR(6) PRIMARY KEY,
+        Password VARCHAR(100) NOT NULL,
+        UserName VARCHAR(100) NOT NULL,
+        Avatar LONGBLOB
+    );";
+                    new MySqlCommand(userTable, conn).ExecuteNonQuery();
+
+                    string chatTable = @"
+    CREATE TABLE IF NOT EXISTS chatinfo (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        sender VARCHAR(6),
+        receiver VARCHAR(6),
+        message TEXT,
+        send_time DATETIME
+    );";
+                    new MySqlCommand(chatTable, conn).ExecuteNonQuery();
+
+                    string friendTable = @"
+    CREATE TABLE IF NOT EXISTS friend (
+        Myaccount VARCHAR(6),
+        FriendUID VARCHAR(6),
+        UIDName VARCHAR(100),
+        PRIMARY KEY (Myaccount, FriendUID)
+    );";
+                    new MySqlCommand(friendTable, conn).ExecuteNonQuery();
+                }
+
+
+                listServerMessage.Items.Add($"数据库 `{dbName}` 和表结构检查完成。");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("初始化数据库失败：" + ex.Message);
+            }
+        }
+
         private void LoadServerConfig()
         {
             try
@@ -52,9 +111,11 @@ namespace WeChattingServer
                 string password = doc.SelectSingleNode("/ServerConfig/Database/Password")?.InnerText;
                 string dbName = doc.SelectSingleNode("/ServerConfig/Database/Name")?.InnerText;
                 string charset = doc.SelectSingleNode("/ServerConfig/Database/Charset")?.InnerText ?? "utf8";
-
+                // 自动初始化数据库及表
+                EnsureDatabaseAndTablesExist(host, user, password, dbName, charset);
                 // 构建连接字符串
-                connStr = $"server={host};user id={user};password={password};database={dbName};charset={charset};";
+                connStr = $"server={host};user id={user};password={password};database={dbName};charset={charset};Pooling=true;MinimumPoolSize=0;MaximumPoolSize=100;";
+
                 listServerMessage.Items.Add("已加载配置文件 server_config.xml");
             }
             catch (Exception ex)
@@ -73,31 +134,48 @@ namespace WeChattingServer
             server.Start();
             listServerMessage.Items.Add($"TCP服务器启动成功，监听端口：{serverPort}");
 
-            ListenForClientsAsync();
+            cts = new CancellationTokenSource(); // 初始化新的取消令牌
+            ListenForClientsAsync(cts.Token);   // 启动监听，传入 token
         }
 
-
-        private async void ListenForClientsAsync()
-
+        private async void ListenForClientsAsync(CancellationToken token)
         {
-            while (true)
+            try
             {
-                try
+                while (!token.IsCancellationRequested)
                 {
-                    TcpClient client = await server.AcceptTcpClientAsync();
-                    lock (locker)
+                    // 使用带取消令牌的等待方式（包裹成 Task）
+                    var acceptTask = server.AcceptTcpClientAsync();
+                    var completedTask = await Task.WhenAny(acceptTask, Task.Delay(-1, token));
+
+                    if (completedTask == acceptTask)
                     {
-                        clientList.Add(client);
+                        TcpClient client = acceptTask.Result;
+
+                        lock (locker)
+                        {
+                            clientList.Add(client);
+                        }
+
+                        _ = HandleClientCommAsync(client); // 启动客户端处理任务
                     }
-                    _ = HandleClientCommAsync(client); // 启动客户端处理任务，不阻塞主循环
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("监听客户端连接异常：" + ex.Message);
-                    break;
+                    else
+                    {
+                        // 取消任务触发（说明是 Task.Delay 结束）
+                        break;
+                    }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                listServerMessage.Items.Add("服务器监听已中断（手动取消）");
+            }
+            catch (Exception ex)
+            {
+                listServerMessage.Items.Add("监听客户端异常：" + ex.Message);
+            }
         }
+
         private async Task HandleClientCommAsync(TcpClient client)
         {
             NetworkStream stream = client.GetStream();
@@ -359,11 +437,17 @@ namespace WeChattingServer
             await stream.WriteAsync(toSend, 0, toSend.Length);
         }
 
-
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-            server?.Stop();
-            listenThread?.Abort();
+            try
+            {
+                cts?.Cancel();       // 触发取消
+                server?.Stop();      // 停止监听
+            }
+            catch (Exception ex)
+            {
+                listServerMessage.Items.Add("关闭服务器时发生错误：" + ex.Message);
+            }
         }
 
 
