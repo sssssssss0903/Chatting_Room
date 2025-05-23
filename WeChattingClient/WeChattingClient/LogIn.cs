@@ -11,24 +11,14 @@ namespace WeChattingClient
     public partial class LogIn : Form
     {
         private static string connectstring = DbConfig.GetConnectionString();
-        private static System.Net.Sockets.TcpClient client;
-        private static NetworkStream stream;
+
         public LogIn()
-        {   
+        {
             InitializeComponent();
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
+            textInputPassword.UseSystemPasswordChar = true;
             LoadLoginFromXml();
-            // 初始化 TCP 连接
-            try
-            {
-                client = new TcpClient("127.0.0.1", 8888);
-                stream = client.GetStream();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("无法连接服务器：" + ex.Message);
-            }
         }
 
         private void buttonLogIn_Click(object sender, EventArgs e)
@@ -44,35 +34,26 @@ namespace WeChattingClient
 
             try
             {
-                // 1. 建立连接（如未连接）
-                if (client == null || !client.Connected)
+                // 保证连接状态干净
+                TcpConnectionManager.Close();
+                if (!TcpConnectionManager.Connect())
                 {
-                    string serverIP = "127.0.0.1"; 
-                    int serverPort = 8888;
-                    client = new TcpClient();
-                    client.Connect(serverIP, serverPort);
-                    stream = client.GetStream();
+                    MessageBox.Show("连接服务器失败", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
 
-                // 2. 构造登录请求
+                // 构造登录消息并发送
                 string loginMsg = $"LOGIN${account}${password}";
                 byte[] body = Encoding.UTF8.GetBytes(loginMsg);
                 byte[] length = BitConverter.GetBytes(body.Length);
                 byte[] message = new byte[4 + body.Length];
                 Buffer.BlockCopy(length, 0, message, 0, 4);
                 Buffer.BlockCopy(body, 0, message, 4, body.Length);
+                TcpConnectionManager.Send(message);
 
-                stream.Write(message, 0, message.Length);
-
-                // 3. 等待响应（先读4字节长度）
+                // 接收响应长度
                 byte[] lenBuf = new byte[4];
-                int lenRead = stream.Read(lenBuf, 0, 4);
-                if (lenRead != 4)
-                {
-                    MessageBox.Show("未能读取完整响应长度", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
+                TcpConnectionManager.Read(lenBuf, 0, 4);
                 int respLen = BitConverter.ToInt32(lenBuf, 0);
                 if (respLen <= 0 || respLen > 10000)
                 {
@@ -80,22 +61,11 @@ namespace WeChattingClient
                     return;
                 }
 
+                // 接收响应体
                 byte[] respBody = new byte[respLen];
-                int totalRead = 0;
-                while (totalRead < respLen)
-                {
-                    int r = stream.Read(respBody, totalRead, respLen - totalRead);
-                    if (r == 0)
-                    {
-                        MessageBox.Show("连接中断", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-                    totalRead += r;
-                }
-
+                TcpConnectionManager.Read(respBody, 0, respLen);
                 string response = Encoding.UTF8.GetString(respBody);
 
-                // 4. 处理响应
                 if (response.StartsWith("LOGIN_OK$"))
                 {
                     string[] parts = response.Split('$');
@@ -103,17 +73,17 @@ namespace WeChattingClient
                     {
                         string userName = parts[1];
 
-                        // 登录成功后发送上线标识
+                        // 发送上线标识
                         string onlineMsg = $"######$你好${account}";
                         byte[] onlineBody = Encoding.UTF8.GetBytes(onlineMsg);
                         byte[] onlineLen = BitConverter.GetBytes(onlineBody.Length);
                         byte[] onlinePacket = new byte[4 + onlineBody.Length];
                         Buffer.BlockCopy(onlineLen, 0, onlinePacket, 0, 4);
                         Buffer.BlockCopy(onlineBody, 0, onlinePacket, 4, onlineBody.Length);
-                        stream.Write(onlinePacket, 0, onlinePacket.Length);
+                        TcpConnectionManager.Send(onlinePacket);
 
-                        // 跳转主窗口
-                        Form1 userForm = new Form1(account, password, userName, client, stream);
+                        // 打开主窗口
+                        Form1 userForm = new Form1(account, password, userName);
                         userForm.Show();
                         this.Hide();
                     }
@@ -122,10 +92,16 @@ namespace WeChattingClient
                         MessageBox.Show("登录响应格式错误", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
+                else if (response.StartsWith("LOGIN_FAIL2"))
+                {
+                    MessageBox.Show("该账号已在其他设备登录", "登录失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
                 else if (response.StartsWith("LOGIN_FAIL"))
                 {
                     MessageBox.Show("账号或密码错误", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
+               
+
                 else
                 {
                     MessageBox.Show("未知响应：" + response, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -137,50 +113,33 @@ namespace WeChattingClient
             }
         }
 
-
-
-        // 注册按钮点击事件：跳转注册页面
         private void buttonRegister_Click(object sender, EventArgs e)
-        { 
+        {
             Register registerForm = new Register();
             registerForm.Show();
             this.Hide();
         }
 
-        // 最小化按钮事件
         private void pictureBox2_Click(object sender, EventArgs e)
         {
             this.WindowState = FormWindowState.Minimized;
         }
 
-        // 关闭按钮事件
         private void pictureBox3_Click(object sender, EventArgs e)
         {
             Application.ExitThread();
         }
 
-        // 密码框文本改变事件（未启用逻辑）
-        private void textInputPassword_TextChanged(object sender, EventArgs e)
-        {
-        }
+        private void textInputPassword_TextChanged(object sender, EventArgs e) { }
+        private void textInputAccount_TextChanged(object sender, EventArgs e) { }
+        private void LogIn_Load(object sender, EventArgs e) { }
 
-        // 账号框文本改变事件（未启用逻辑）
-        private void textInputAccount_TextChanged(object sender, EventArgs e)
-        {
-        }
-
-        // 窗体加载事件（未启用逻辑）
-        private void LogIn_Load(object sender, EventArgs e)
-        {
-        }
         private void LoadLoginFromXml()
         {
             try
             {
-              
                 string uid = DbConfig.UID;
                 string pwd = DbConfig.Password;
-             
 
                 if (!string.IsNullOrEmpty(uid)) textInputAccount.Text = uid;
                 if (!string.IsNullOrEmpty(pwd)) textInputPassword.Text = pwd;
@@ -190,6 +149,5 @@ namespace WeChattingClient
                 MessageBox.Show("读取登录信息失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
     }
 }

@@ -26,8 +26,6 @@ namespace WeChattingClient
         private string MyPassword;
         private static string MyName;
 
-        private static TcpClient client;
-        private static NetworkStream stream;
 
         //是否运行
         private bool isRunning;
@@ -78,12 +76,11 @@ namespace WeChattingClient
 
         }
         #region 带参构造函数
-        public Form1(string myaccount, string mypassword, string myname, TcpClient myclient, NetworkStream mystream)
+        public Form1(string myaccount, string mypassword, string myname)
         {
             InitializeComponent();
             
-            client = myclient;
-          stream = mystream;
+
 
             this.FormClosing += Form1_FormClosing;
 
@@ -102,7 +99,7 @@ namespace WeChattingClient
             Buffer.BlockCopy(length, 0, toSend, 0, 4);
             Buffer.BlockCopy(body, 0, toSend, 4, body.Length);
 
-            stream.Write(toSend, 0, toSend.Length);
+            TcpConnectionManager.Send(toSend);
 
             //轮询获得好友列表
             StartFriendListAutoRefresh();
@@ -382,7 +379,7 @@ namespace WeChattingClient
                 {
                     // === 第一步：读取4字节长度头 ===
                     byte[] lengthBytes = new byte[4];
-                    int bytesRead = stream.Read(lengthBytes, 0, 4);
+                    int bytesRead = TcpConnectionManager.Read(lengthBytes, 0, 4);
                     if (bytesRead != 4)
                     {
                         Console.WriteLine("[客户端] 接收长度失败，连接可能关闭");
@@ -401,7 +398,7 @@ namespace WeChattingClient
                     int totalRead = 0;
                     while (totalRead < messageLength)
                     {
-                        int read = stream.Read(messageBytes, totalRead, messageLength - totalRead);
+                        int read = TcpConnectionManager.Read(messageBytes, totalRead, messageLength - totalRead);
                         if (read == 0)
                         {
                             Console.WriteLine("[客户端] 服务器断开连接");
@@ -679,15 +676,7 @@ namespace WeChattingClient
                 Buffer.BlockCopy(lengthBytes, 0, fullMessage, 0, 4);
                 Buffer.BlockCopy(messageBody, 0, fullMessage, 4, messageBody.Length);
 
-                if (stream != null && stream.CanWrite)
-                {
-                    stream.Write(fullMessage, 0, fullMessage.Length);
-                }
-                else
-                {
-                    MessageBox.Show("发送失败：网络连接已断开。");
-                    return;
-                }
+                TcpConnectionManager.Send(fullMessage);
 
                 // 本地显示
                 string displayName = (receiverUID == "000000")
@@ -1003,15 +992,9 @@ namespace WeChattingClient
                 Buffer.BlockCopy(lengthBytes, 0, fullMessage, 0, 4);
                 Buffer.BlockCopy(messageBody, 0, fullMessage, 4, messageBody.Length);
 
-                if (stream != null && stream.CanWrite)
-                {
-                    stream.Write(fullMessage, 0, fullMessage.Length);
-                    MessageBox.Show("发送成功");
-                }
-                else
-                {
-                    MessageBox.Show("连接已关闭，发送失败");
-                }
+               
+                TcpConnectionManager.Send(fullMessage);
+             
             }
             catch (Exception ex)
 
@@ -1318,9 +1301,7 @@ namespace WeChattingClient
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             isRunning = false;
-            stream?.Close();
-            client?.Close();
-            client?.Dispose();
+            TcpConnectionManager.Close();
             Application.Exit();
         }
 

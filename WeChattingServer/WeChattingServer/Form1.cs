@@ -211,7 +211,7 @@ namespace WeChattingServer
                             string uid = parts[1];
                             string pwd = parts[2];
                             string name = parts[3];
-
+                           
                             try
                             {
                                 using (MySqlConnection conn = new MySqlConnection(connStr))
@@ -267,6 +267,17 @@ namespace WeChattingServer
                         {
                             string uid = parts[1];
                             string pwd = parts[2];
+                            bool isOnline;
+                            lock (locker)
+                            {
+                                isOnline = uidToClient.ContainsKey(uid);
+                            }
+
+                            if (isOnline)
+                            {
+                                await SendMessageAsync(stream, "LOGIN_FAIL2$该账号已在其他地方登录");
+                                return;
+                            }
 
                             try
                             {

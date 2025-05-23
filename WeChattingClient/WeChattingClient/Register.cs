@@ -17,9 +17,11 @@ namespace WeChattingClient
             InitializeComponent();
             this.FormClosing += Register_FormClosing;
             GenerateUniqueUID(); // 自动生成不重复UID
-                                 
+            textPassword1.UseSystemPasswordChar = true;
+            textPassword2.UseSystemPasswordChar = true;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
+
         }
 
         private void Register_FormClosing(object sender, FormClosingEventArgs e)
@@ -55,8 +57,6 @@ namespace WeChattingClient
             }
         }
 
-        private TcpClient client;
-        private NetworkStream stream;
 
         private void buttonRegister_Click(object sender, EventArgs e)
         {
@@ -84,12 +84,14 @@ namespace WeChattingClient
             try
             {
                 // 建立连接
-                if (client == null || !client.Connected)
+                if (!TcpConnectionManager.IsConnected)
                 {
-                    client = new TcpClient("127.0.0.1", 8888);
-                    stream = client.GetStream();
+                    if (!TcpConnectionManager.Connect())
+                    {
+                        MessageBox.Show("连接服务器失败");
+                        return;
+                    }
                 }
-
                 // 构造注册消息
                 string registerMsg = $"REGISTER${uid}${pwd1}${name}";
                 byte[] body = Encoding.UTF8.GetBytes(registerMsg);
@@ -97,11 +99,11 @@ namespace WeChattingClient
                 byte[] message = new byte[4 + body.Length];
                 Buffer.BlockCopy(length, 0, message, 0, 4);
                 Buffer.BlockCopy(body, 0, message, 4, body.Length);
-                stream.Write(message, 0, message.Length);
-
+                //stream.Write(message, 0, message.Length);
+                TcpConnectionManager.Send(message);
                 // === 使用长度头读取响应 ===
                 byte[] lenBuf = new byte[4];
-                int lenRead = stream.Read(lenBuf, 0, 4);
+                int lenRead = TcpConnectionManager.Read(lenBuf, 0, 4);
                 if (lenRead != 4)
                 {
                     MessageBox.Show("读取响应长度失败", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -119,7 +121,7 @@ namespace WeChattingClient
                 int totalRead = 0;
                 while (totalRead < respLen)
                 {
-                    int r = stream.Read(respBody, totalRead, respLen - totalRead);
+                    int r = TcpConnectionManager.Read(respBody, totalRead, respLen - totalRead);
                     if (r == 0)
                     {
                         MessageBox.Show("连接中断", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -134,7 +136,7 @@ namespace WeChattingClient
                 if (response.StartsWith("REGISTER_OK"))
                 {
                     MessageBox.Show("注册成功！", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    Form1 userForm = new Form1(uid, pwd1, name, client, stream);
+                    Form1 userForm = new Form1(uid, pwd1, name);
                     userForm.Show();
                     this.Hide();
                 }
