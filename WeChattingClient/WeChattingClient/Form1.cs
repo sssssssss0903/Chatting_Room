@@ -648,7 +648,14 @@ namespace WeChattingClient
             if (string.IsNullOrWhiteSpace(textSend.Text))
                 return;
 
-            string message = textSend.Text.Trim();
+            string rawmessage = textSend.Text.Trim();
+            string message = FilterMessageBody(rawmessage);
+
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                Console.WriteLine("消息为空或被过滤为无效，已拦截");
+                return;
+            }
             textSend.Text = "";
 
             try
@@ -658,12 +665,7 @@ namespace WeChattingClient
 
                 // 构造消息格式：receiverUID$message$Myaccount
                 string sendMessage = receiverUID + "$" + message + "$" + Myaccount;
-                string filteredMessage = FilterMessageBody(sendMessage);
-                if (string.IsNullOrWhiteSpace(filteredMessage))
-                {
-                    Console.WriteLine("消息为空或被过滤为无效，已拦截");
-                    return;
-                }
+      
                 // 转为 UTF8 字节
                 byte[] messageBody = Encoding.UTF8.GetBytes(sendMessage);
              
