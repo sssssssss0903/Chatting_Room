@@ -1,16 +1,17 @@
-﻿using System;
+﻿using MySql.Data.MySqlClient;
+using Mysqlx;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
-using System.Windows.Forms;
-using MySql.Data.MySqlClient;
-using System.Linq;
 using System.Text.RegularExpressions;
-using System.Xml;
+using System.Threading;
 using System.Threading.Tasks;
-
+using System.Windows.Forms;
+using System.Xml;
+using BCrypt.Net;
 
 namespace WeChattingServer
 {
@@ -233,11 +234,14 @@ namespace WeChattingServer
                                     }
 
                                     // 插入新用户
+                                  
+                                    string hashedPwd = BCrypt.Net.BCrypt.HashPassword(pwd); // 加密密码
+
                                     string insertSql = "INSERT INTO userinfo (UID, Password, UserName) VALUES (@uid, @pwd, @name)";
                                     using (var insertCmd = new MySqlCommand(insertSql, conn))
                                     {
                                         insertCmd.Parameters.AddWithValue("@uid", uid);
-                                        insertCmd.Parameters.AddWithValue("@pwd", pwd);
+                                        insertCmd.Parameters.AddWithValue("@pwd", hashedPwd);
                                         insertCmd.Parameters.AddWithValue("@name", name);
                                         await insertCmd.ExecuteNonQueryAsync();
                                     }
@@ -284,7 +288,7 @@ namespace WeChattingServer
                                 using (MySqlConnection conn = new MySqlConnection(connStr))
                                 {
                                     await conn.OpenAsync();
-                                    string sql = "SELECT UserName FROM userinfo WHERE UID = @uid AND Password = @pwd";
+                                    string sql = "SELECT UserName, Password FROM userinfo WHERE UID = @uid";
                                     using (MySqlCommand cmd = new MySqlCommand(sql, conn))
                                     {
                                         cmd.Parameters.AddWithValue("@uid", uid);
@@ -295,15 +299,25 @@ namespace WeChattingServer
                                             if (await reader.ReadAsync())
                                             {
                                                 string userName = reader.GetString(reader.GetOrdinal("UserName"));
-                                                string successMsg = $"LOGIN_OK${userName}";
-                                                await SendMessageAsync(stream, successMsg);
-                                            }
+                                                string storedHash = reader.GetString(reader.GetOrdinal("Password"));
 
+                                                // 验证密码
+                                                if (BCrypt.Net.BCrypt.Verify(pwd, storedHash))
+                                                {
+                                                    string successMsg = $"LOGIN_OK${userName}";
+                                                    await SendMessageAsync(stream, successMsg);
+                                                }
+                                                else
+                                                {
+                                                    await SendMessageAsync(stream, "LOGIN_FAIL");
+                                                }
+                                            }
                                             else
                                             {
                                                 await SendMessageAsync(stream, "LOGIN_FAIL");
                                             }
                                         }
+
                                     }
                                 }
                             }
@@ -406,6 +420,7 @@ namespace WeChattingServer
                     catch (Exception ex)
                     {
                         Console.WriteLine("保存消息失败：" + ex.Message);
+                        this.Invoke(new Action(() => listServerMessage.Items.Add(ex.Message)));
                     }
                 }
             }

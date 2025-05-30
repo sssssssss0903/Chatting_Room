@@ -6,6 +6,6 @@
 		<User>root</User>
 		<Password>123456</Password>
 		<Name>wechatting</Name>
-		<Charset>utf8</Charset>
+		<Charset>utf8mb4</Charset>
 	</Database>
 </ServerConfig>

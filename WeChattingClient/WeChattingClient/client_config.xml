@@ -8,5 +8,6 @@
 		<Name>wechatting</Name>
 		<User>root</User>
 		<DbPassword>123456</DbPassword>
+		<Charset>utf8mb4</Charset>
 	</Database>
 </ClientConfig>
